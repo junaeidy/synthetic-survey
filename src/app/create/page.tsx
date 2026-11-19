@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createSurveyWithInstantResponses } from '@/lib/storage';
@@ -14,6 +14,8 @@ import {
   FileText,
   Loader2,
   Sparkles,
+  FileUp,
+  CheckCircle2,
 } from 'lucide-react';
 
 interface QuestionDraft {
@@ -22,46 +24,69 @@ interface QuestionDraft {
   options: string[];
 }
 
+const DEFAULT_LIKERT_OPTIONS = [
+  '1 - Sangat Tidak Setuju (STS)',
+  '2 - Tidak Setuju (TS)',
+  '3 - Ragu-ragu/Netral (N)',
+  '4 - Setuju (S)',
+  '5 - Sangat Setuju (SS)',
+];
+
 const TEMPLATES = [
   {
-    title: 'Survei Kepuasan Layanan Platform Akademik & E-Learning Kampus',
-    description: 'Mengukur kemudahan akses, ketersediaan materi digital, dan kecepatan respon layanan bantuan kampus.',
-    target_respondents: 40,
+    title: 'Penciptaan Media Pembelajaran Menggunakan Articulate, Canva, dan ChatGPT',
+    description: 'Responden: Mahasiswa Program Studi Pendidikan Islam / PAUD untuk mengukur kemudahan, persepsi, dan kualitas media pembelajaran.',
+    target_respondents: 35,
     questions: [
       {
-        question_text: 'Seberapa sering Anda mengakses portal e-learning dalam seminggu?',
+        question_text: 'Semester saat ini',
         question_type: 'multiple_choice' as QuestionType,
-        options: ['Hampir Setiap Hari', '3-4 Kali Seminggu', '1-2 Kali Seminggu', 'Jarang Sekali'],
+        options: ['1-2', '3-4', '5-6', '7 atau lebih'],
       },
       {
-        question_text: 'Apakah tampilan antarmuka (UI) portal saat ini mudah dipahami oleh mahasiswa baru?',
-        question_type: 'boolean' as QuestionType,
-        options: ['Ya', 'Tidak'],
+        question_text: 'Pengalaman menggunakan ChatGPT sebelum perkuliahan ini',
+        question_type: 'multiple_choice' as QuestionType,
+        options: ['Belum pernah', 'Pernah, kurang dari 1 bulan', 'Pernah, 1-6 bulan', 'Lebih dari 6 bulan'],
       },
       {
-        question_text: 'Fitur atau perbaikan apa yang paling mendesak dibutuhkan pada portal kampus ini?',
+        question_text: 'Antarmuka aplikasi mudah dipahami dan dioperasikan',
+        question_type: 'likert' as QuestionType,
+        options: DEFAULT_LIKERT_OPTIONS,
+      },
+      {
+        question_text: 'Saya dapat mempelajari fitur dasar aplikasi dalam waktu singkat',
+        question_type: 'likert' as QuestionType,
+        options: DEFAULT_LIKERT_OPTIONS,
+      },
+      {
+        question_text: 'Aplikasi memungkinkan pembuatan media yang lebih interaktif dibanding presentasi biasa',
+        question_type: 'likert' as QuestionType,
+        options: DEFAULT_LIKERT_OPTIONS,
+      },
+      {
+        question_text: 'Tuliskan kritik, kendala, atau saran pengembangan media pembelajaran:',
         question_type: 'text' as QuestionType,
         options: [],
       },
     ],
   },
   {
-    title: 'Riset Preferensi Konsumen Terhadap Promo Bebas Ongkir E-Commerce',
-    description: 'Analisis perilaku belanja online dan faktor penentu pemilihan platform marketplace.',
-    target_respondents: 50,
+    title: 'Survei Evaluasi Pengalaman Belanja Online & Bebas Ongkir',
+    description: 'Riset perilaku konsumen terhadap promo gratis ongkir dan pertimbangan checkout belanja digital.',
+    target_respondents: 40,
     questions: [
       {
-        question_text: 'Apa pertimbangan utama Anda saat memilih aplikasi belanja online?',
+        question_text: 'Apa pertimbangan utama Anda saat memilih marketplace online?',
         question_type: 'multiple_choice' as QuestionType,
-        options: ['Gratis Ongkir Tanpa Minimum', 'Harga Barang Termurah', 'Kecepatan Pengiriman', 'Keaslian Produk Terjamin'],
+        options: ['Gratis Ongkir', 'Harga Termurah', 'Kecepatan Pengiriman', 'Keaslian Produk'],
       },
       {
-        question_text: 'Apakah Anda pernah membatalkan pesanan karena biaya pengiriman dirasa terlalu mahal?',
-        question_type: 'boolean' as QuestionType,
-        options: ['Ya', 'Tidak'],
+        question_text: 'Promo gratis ongkir mempengaruhi keputusan saya untuk menyelesaikan pembayaran',
+        question_type: 'likert' as QuestionType,
+        options: DEFAULT_LIKERT_OPTIONS,
       },
       {
-        question_text: 'Tuliskan pengalaman Anda mengenai klaim voucer diskon yang paling sering Anda gunakan:',
+        question_text: 'Tuliskan pengalaman atau kendala Anda terkait voucer promo belanja:',
         question_type: 'text' as QuestionType,
         options: [],
       },
@@ -71,6 +96,7 @@ const TEMPLATES = [
 
 export default function CreateSurveyPage() {
   const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const now = new Date();
   const plus7Days = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
@@ -83,14 +109,14 @@ export default function CreateSurveyPage() {
 
   const [questions, setQuestions] = useState<QuestionDraft[]>([
     {
-      question_text: 'Bagaimana penilaian Anda terhadap stabilitas sistem ini?',
+      question_text: 'Semester saat ini',
       question_type: 'multiple_choice',
-      options: ['Sangat Baik', 'Cukup Baik', 'Kurang Memuaskan'],
+      options: ['1-2', '3-4', '5-6', '7 atau lebih'],
     },
     {
-      question_text: 'Apakah Anda akan merekomendasikan layanan ini kepada rekan Anda?',
-      question_type: 'boolean',
-      options: ['Ya', 'Tidak'],
+      question_text: 'Antarmuka aplikasi mudah dipahami dan dioperasikan',
+      question_type: 'likert',
+      options: DEFAULT_LIKERT_OPTIONS,
     },
     {
       question_text: 'Tuliskan masukan atau kritik membangun yang Anda miliki:',
@@ -100,6 +126,8 @@ export default function CreateSurveyPage() {
   ]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploadingDoc, setIsUploadingDoc] = useState(false);
+  const [docSuccessMsg, setDocSuccessMsg] = useState<string | null>(null);
 
   const applyTemplate = (t: typeof TEMPLATES[0]) => {
     setTitle(t.title);
@@ -113,13 +141,59 @@ export default function CreateSurveyPage() {
     );
   };
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingDoc(true);
+    setDocSuccessMsg(null);
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const res = await fetch('/api/parse-document', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const resData = await res.json();
+      if (!res.ok || !resData.success) {
+        throw new Error(resData.error || 'Gagal membaca dokumen');
+      }
+
+      const extracted = resData.data;
+      if (extracted.title) setTitle(extracted.title);
+      if (extracted.description) setDescription(extracted.description);
+      if (extracted.target_respondents) setTargetRespondents(extracted.target_respondents);
+
+      if (Array.isArray(extracted.questions) && extracted.questions.length > 0) {
+        setQuestions(
+          extracted.questions.map((q: { question_text?: string; question_type?: QuestionType; options?: string[] }) => ({
+            question_text: q.question_text || '',
+            question_type: (q.question_type as QuestionType) || 'multiple_choice',
+            options: Array.isArray(q.options) && q.options.length > 0 ? q.options : q.question_type === 'likert' ? DEFAULT_LIKERT_OPTIONS : [],
+          }))
+        );
+      }
+
+      setDocSuccessMsg(`Berhasil mengekstrak ${extracted.questions?.length || 0} butir pertanyaan dari ${file.name}!`);
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      alert(`Gagal mengekstrak dokumen Word: ${errMsg}`);
+    } finally {
+      setIsUploadingDoc(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   const handleAddQuestion = () => {
     setQuestions((prev) => [
       ...prev,
       {
         question_text: '',
-        question_type: 'multiple_choice',
-        options: ['Pilihan A', 'Pilihan B', 'Pilihan C'],
+        question_type: 'likert',
+        options: DEFAULT_LIKERT_OPTIONS,
       },
     ]);
   };
@@ -137,7 +211,9 @@ export default function CreateSurveyPage() {
       const copy = [...prev];
       copy[idx] = { ...copy[idx], [field]: val };
       if (field === 'question_type') {
-        if (val === 'boolean') {
+        if (val === 'likert') {
+          copy[idx].options = DEFAULT_LIKERT_OPTIONS;
+        } else if (val === 'boolean') {
           copy[idx].options = ['Ya', 'Tidak'];
         } else if (val === 'multiple_choice' && copy[idx].options.length === 0) {
           copy[idx].options = ['Pilihan A', 'Pilihan B', 'Pilihan C'];
@@ -150,7 +226,7 @@ export default function CreateSurveyPage() {
   const handleAddOption = (qIdx: number) => {
     setQuestions((prev) => {
       const copy = [...prev];
-      copy[qIdx].options = [...copy[qIdx].options, `Pilihan ${String.fromCharCode(65 + copy[qIdx].options.length)}`];
+      copy[qIdx].options = [...copy[qIdx].options, `Opsi ${copy[qIdx].options.length + 1}`];
       return copy;
     });
   };
@@ -186,7 +262,6 @@ export default function CreateSurveyPage() {
 
     setIsSubmitting(true);
     try {
-      // Buat angket dan LANGSUNG isi seluruh responden bot secara instan
       const newId = await createSurveyWithInstantResponses(
         {
           title: title.trim(),
@@ -198,7 +273,7 @@ export default function CreateSurveyPage() {
         questions.map((q) => ({
           question_text: q.question_text.trim(),
           question_type: q.question_type,
-          options: q.question_type === 'multiple_choice' ? q.options : q.question_type === 'boolean' ? ['Ya', 'Tidak'] : [],
+          options: q.question_type === 'text' ? [] : q.options,
         }))
       );
 
@@ -224,7 +299,7 @@ export default function CreateSurveyPage() {
 
         {/* Template Selector */}
         <div className="flex items-center gap-2">
-          <span className="text-xs text-neutral-400 font-mono hidden sm:inline">Pakai Template Cepat:</span>
+          <span className="text-xs text-neutral-400 font-mono hidden sm:inline">Template Riset:</span>
           {TEMPLATES.map((t, idx) => (
             <button
               key={idx}
@@ -238,12 +313,65 @@ export default function CreateSurveyPage() {
         </div>
       </div>
 
+      {/* Upload Dokumen Word (AI Docx Parser) */}
+      <div className="rounded-2xl border-2 border-dashed border-neutral-200 bg-white p-6 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/50">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-400 text-[11px] font-mono">
+              <Sparkles className="h-3 w-3" />
+              <span>AI Document Parser (Word / .docx)</span>
+            </div>
+            <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100">
+              Punya Dokumen Angket Word (.docx)?
+            </h3>
+            <p className="text-xs text-neutral-500 max-w-lg">
+              Unggah file Word kuesioner Anda. AI akan otomatis mengekstrak Judul, Sasaran Responden, Pertanyaan Demografi, dan Matriks Skala Likert (STS–SS) ke dalam formulir.
+            </p>
+          </div>
+
+          <div>
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept=".docx,.doc,.txt"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+            <button
+              type="button"
+              disabled={isUploadingDoc}
+              onClick={() => fileInputRef.current?.click()}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-neutral-300 bg-neutral-50 hover:bg-neutral-100 dark:border-neutral-700 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-xs font-semibold text-neutral-800 dark:text-neutral-200 transition-all shadow-sm disabled:opacity-50"
+            >
+              {isUploadingDoc ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin text-indigo-600" />
+                  <span>AI Sedang Membaca Dokumen...</span>
+                </>
+              ) : (
+                <>
+                  <FileUp className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                  <span>Unggah File Word (.docx)</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {docSuccessMsg && (
+          <div className="mt-4 flex items-center gap-2 rounded-lg bg-emerald-50 p-2.5 text-xs text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
+            <span>{docSuccessMsg}</span>
+          </div>
+        )}
+      </div>
+
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
-          Buat Angket Kuesioner Baru
+          Parameter & Butir Pertanyaan Angket
         </h1>
         <p className="mt-1 text-xs text-neutral-500">
-          Setelah disimpan, seluruh responden bot akan <strong>langsung mengisi kuesioner secara otomatis</strong> dengan sebaran tanggal dan waktu yang berbeda-beda.
+          Periksa butir pertanyaan di bawah ini. Setelah disimpan, seluruh responden bot akan <strong>langsung mengisi kuesioner secara otomatis</strong> dengan sebaran tanggal dan waktu yang berbeda-beda.
         </p>
       </div>
 
@@ -262,7 +390,7 @@ export default function CreateSurveyPage() {
             <input
               type="text"
               required
-              placeholder="Contoh: Survei Evaluasi Kepuasan Pembelajaran Digital..."
+              placeholder="Contoh: Penciptaan Media Pembelajaran Menggunakan Articulate..."
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3.5 py-2 text-xs text-neutral-900 focus:border-neutral-400 focus:bg-white focus:outline-none dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-100 dark:focus:bg-neutral-900"
@@ -271,11 +399,11 @@ export default function CreateSurveyPage() {
 
           <div>
             <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1">
-              Deskripsi Singkat / Tujuan Penelitian
+              Deskripsi Singkat & Sasaran Responden (Membantu AI Membentuk Karakter Persona)
             </label>
             <textarea
               rows={2}
-              placeholder="Jelaskan latar belakang atau fokus riset untuk membantu bot memahami konteks pertanyaan..."
+              placeholder="Contoh: Responden: Mahasiswa Program Studi Pendidikan Islam / PAUD..."
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3.5 py-2 text-xs text-neutral-900 focus:border-neutral-400 focus:bg-white focus:outline-none dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-100 dark:focus:bg-neutral-900"
@@ -364,6 +492,7 @@ export default function CreateSurveyPage() {
                       }
                       className="rounded-lg border border-neutral-200 bg-neutral-50 px-2.5 py-1 text-xs font-mono text-neutral-800 focus:outline-none dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-200"
                     >
+                      <option value="likert">Skala Likert (1-5 STS s/d SS)</option>
                       <option value="multiple_choice">Pilihan Ganda (A, B, C...)</option>
                       <option value="boolean">Benar / Salah (Ya / Tidak)</option>
                       <option value="text">Isian Bebas (Kualitatif / Teks)</option>
@@ -386,7 +515,7 @@ export default function CreateSurveyPage() {
                   <input
                     type="text"
                     required
-                    placeholder={`Tuliskan teks pertanyaan nomor ${idx + 1}...`}
+                    placeholder={`Tuliskan teks pertanyaan / pernyataan nomor ${idx + 1}...`}
                     value={q.question_text}
                     onChange={(e) => handleQuestionChange(idx, 'question_text', e.target.value)}
                     className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs text-neutral-900 focus:border-neutral-400 focus:bg-white focus:outline-none dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-100"
@@ -394,6 +523,20 @@ export default function CreateSurveyPage() {
                 </div>
 
                 {/* Sub-form based on Question Type */}
+                {q.question_type === 'likert' && (
+                  <div className="pt-2 border-t border-neutral-100 dark:border-neutral-800 flex flex-wrap items-center gap-1.5 text-xs text-neutral-600 dark:text-neutral-400 font-mono">
+                    <span className="text-[11px] text-neutral-400 mr-1">Skala 1–5:</span>
+                    {q.options.map((opt, oIdx) => (
+                      <span
+                        key={oIdx}
+                        className="px-2 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 text-[11px] text-neutral-700 dark:text-neutral-300"
+                      >
+                        {opt}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
                 {q.question_type === 'multiple_choice' && (
                   <div className="space-y-2 pt-2 border-t border-neutral-100 dark:border-neutral-800">
                     <div className="flex items-center justify-between">
@@ -413,7 +556,7 @@ export default function CreateSurveyPage() {
                       {q.options.map((opt, optIdx) => (
                         <div key={optIdx} className="flex items-center gap-1.5">
                           <span className="text-xs font-mono text-neutral-400 w-4 text-center">
-                            {String.fromCharCode(65 + optIdx)}.
+                            {optIdx + 1}.
                           </span>
                           <input
                             type="text"
@@ -451,7 +594,7 @@ export default function CreateSurveyPage() {
 
                 {q.question_type === 'text' && (
                   <div className="pt-2 border-t border-neutral-100 dark:border-neutral-800 text-xs text-neutral-500 font-mono">
-                    💡 Bot AI akan langsung mengisi tanggapan teks autentik berbahasa Indonesia bervariasi sesuai profil persona.
+                    💡 Bot AI akan langsung mengisi tanggapan teks kualitatif berbahasa Indonesia yang autentik sesuai persona.
                   </div>
                 )}
               </div>
@@ -475,12 +618,12 @@ export default function CreateSurveyPage() {
             {isSubmitting ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Menghasilkan...</span>
+                <span>Menghasilkan {targetRespondents} Responden Bot (Tanggal Acak)...</span>
               </>
             ) : (
               <>
                 <Sparkles className="h-4 w-4" />
-                <span>Simpan</span>
+                <span>Simpan & Langsung Buat Hasil Grafik Lengkap</span>
               </>
             )}
           </button>

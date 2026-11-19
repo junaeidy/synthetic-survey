@@ -1,4 +1,4 @@
-export type QuestionType = 'multiple_choice' | 'boolean' | 'text';
+export type QuestionType = 'multiple_choice' | 'boolean' | 'likert' | 'text';
 
 export type ChartType = 'bar_vertical' | 'bar_horizontal' | 'pie' | 'donut';
 
@@ -7,7 +7,7 @@ export interface Question {
   survey_id: string;
   question_text: string;
   question_type: QuestionType;
-  options?: string[]; // for multiple_choice or boolean labels
+  options?: string[]; // for multiple_choice, boolean, or likert labels
   order_index: number;
   created_at?: string;
 }

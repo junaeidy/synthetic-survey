@@ -1,4 +1,4 @@
-import { Survey, Question, Respondent, Answer, SurveyAnalytics } from '@/types/survey';
+import { Survey, Question, Respondent, Answer, SurveyAnalytics, QuestionType } from '@/types/survey';
 import { getSupabase, isSupabaseConfigured } from './supabase';
 import { GeneratedRespondent } from './gemini';
 
@@ -150,7 +150,7 @@ export async function createNewSurvey(
   },
   questions: Array<{
     question_text: string;
-    question_type: 'multiple_choice' | 'boolean' | 'text';
+    question_type: QuestionType;
     options?: string[];
   }>
 ): Promise<string> {
@@ -311,7 +311,7 @@ export async function createSurveyWithInstantResponses(
   },
   questions: Array<{
     question_text: string;
-    question_type: 'multiple_choice' | 'boolean' | 'text';
+    question_type: QuestionType;
     options?: string[];
   }>
 ): Promise<string> {
@@ -391,7 +391,7 @@ export async function fetchSurveyAnalytics(surveyId: string): Promise<SurveyAnal
     const qAnswers = answers.filter((a) => a.question_id === q.id);
     const totalAns = qAnswers.length;
 
-    if (q.question_type === 'multiple_choice' || q.question_type === 'boolean') {
+    if (q.question_type === 'multiple_choice' || q.question_type === 'boolean' || q.question_type === 'likert') {
       const counts: Record<string, number> = {};
 
       if (q.options && q.options.length > 0) {
@@ -413,7 +413,12 @@ export async function fetchSurveyAnalytics(surveyId: string): Promise<SurveyAnal
 
       questionStats[q.id] = {
         question: q,
-        preferredChart: q.question_type === 'boolean' ? 'donut' : 'bar_vertical',
+        preferredChart:
+          q.question_type === 'boolean'
+            ? 'donut'
+            : q.question_type === 'likert'
+            ? 'bar_horizontal'
+            : 'bar_vertical',
         distribution,
       };
     } else {

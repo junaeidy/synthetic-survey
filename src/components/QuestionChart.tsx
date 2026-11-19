@@ -42,6 +42,18 @@ export default function QuestionChart({
 
   const totalResponses = distribution.reduce((acc, curr) => acc + curr.count, 0);
 
+  const getTypeLabel = () => {
+    switch (question.question_type) {
+      case 'likert':
+        return 'Skala Likert (1-5)';
+      case 'boolean':
+        return 'Benar / Salah';
+      case 'multiple_choice':
+      default:
+        return 'Pilihan Ganda';
+    }
+  };
+
   return (
     <div className="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900/60">
       {/* Question Header & Chart Switcher */}
@@ -49,7 +61,7 @@ export default function QuestionChart({
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <span className="text-[11px] font-mono uppercase px-2 py-0.5 rounded bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-400">
-              {question.question_type === 'multiple_choice' ? 'Pilihan Ganda' : 'Benar / Salah'}
+              {getTypeLabel()}
             </span>
             <span className="text-xs font-mono text-neutral-400">
               {totalResponses} respons
@@ -132,7 +144,7 @@ export default function QuestionChart({
                     dataKey="name"
                     tick={{ fontSize: 11, fill: '#737373' }}
                     interval={0}
-                    tickFormatter={(val) => (val.length > 14 ? `${val.slice(0, 14)}...` : val)}
+                    tickFormatter={(val) => (val.length > 16 ? `${val.slice(0, 16)}...` : val)}
                   />
                   <YAxis tick={{ fontSize: 11, fill: '#737373' }} allowDecimals={false} />
                   <Tooltip
@@ -161,9 +173,9 @@ export default function QuestionChart({
                   <YAxis
                     type="category"
                     dataKey="name"
-                    width={100}
+                    width={110}
                     tick={{ fontSize: 11, fill: '#737373' }}
-                    tickFormatter={(val) => (val.length > 12 ? `${val.slice(0, 12)}...` : val)}
+                    tickFormatter={(val) => (val.length > 14 ? `${val.slice(0, 14)}...` : val)}
                   />
                   <Tooltip
                     contentStyle={{

@@ -46,8 +46,21 @@ function generateHeuristicBatch(
     const answers: Record<string, string> = {};
 
     questions.forEach((q) => {
-      if (q.question_type === 'multiple_choice') {
-        const options = q.options && q.options.length > 0 ? q.options : ['Pilihan A', 'Pilihan B', 'Pilihan C'];
+      const options = q.options && q.options.length > 0 ? q.options : ['Pilihan A', 'Pilihan B', 'Pilihan C'];
+
+      if (q.question_type === 'likert') {
+        // Skala Likert 1-5
+        if (personaSeed.sentiment === 'positive') {
+          // Dominan 4 (Setuju) atau 5 (Sangat Setuju)
+          answers[q.id] = options.length >= 5 ? (Math.random() > 0.3 ? options[4] : options[3]) : options[options.length - 1];
+        } else if (personaSeed.sentiment === 'negative') {
+          // Dominan 1 (Sangat Tidak Setuju) atau 2 (Tidak Setuju)
+          answers[q.id] = options.length >= 2 ? (Math.random() > 0.4 ? options[0] : options[1]) : options[0];
+        } else {
+          // Netral / Setuju (skala 3 atau 4)
+          answers[q.id] = options.length >= 4 ? (Math.random() > 0.5 ? options[2] : options[3]) : options[Math.floor(Math.random() * options.length)];
+        }
+      } else if (q.question_type === 'multiple_choice') {
         if (personaSeed.sentiment === 'positive') {
           answers[q.id] = options[0];
         } else if (personaSeed.sentiment === 'negative' && options.length > 1) {
@@ -115,7 +128,9 @@ export async function POST(req: NextRequest) {
         const questionPrompt = questions
           .map((q, idx) => {
             let optDesc = '';
-            if (q.question_type === 'multiple_choice') {
+            if (q.question_type === 'likert') {
+              optDesc = `(Skala Likert 1-5: ${JSON.stringify(q.options || ['1', '2', '3', '4', '5'])})`;
+            } else if (q.question_type === 'multiple_choice') {
               optDesc = `(Pilihan: ${JSON.stringify(q.options || [])})`;
             } else if (q.question_type === 'boolean') {
               optDesc = `(Pilihan: Ya atau Tidak)`;
@@ -126,23 +141,22 @@ export async function POST(req: NextRequest) {
           })
           .join('\n');
 
-        // Panggil batch pertama sampai dengan 8 responden via Gemini langsung
         const geminiBatchSize = Math.min(targetCount, 8);
         const systemPrompt = `Kamu adalah simulator responden survei untuk penelitian ilmiah.
-Tugasmu adalah menghasilkan data sintetis dari ${geminiBatchSize} orang responden Indonesia yang BERBEDA-BEDA dan REALISTIS.
+Tugasmu adalah menghasilkan data sintetis dari ${geminiBatchSize} orang responden Indonesia yang BERBEDA-BEDA dan REALISTIS sesuai konteks dan target audiens survei.
 
 Aturan:
-1. Persona unik (mahasiswa, pekerja kantor, wirausaha, profesional).
+1. Persona unik (misal sesuai target: mahasiswa PAUD, akademisi, atau masyarakat umum).
 2. Variasikan opini (positif, netral, kritis/negatif).
 3. HINDARI AI SLOP! Jawaban isian teks harus terdengar alami seperti ketikan manusia asli Indonesia.
-4. Multiple choice: PILIH SALAH SATU dari daftar opsi.
-5. Boolean: jawab persis "Ya" atau "Tidak".
+4. Untuk multiple_choice dan likert: PILIH SALAH SATU persis dari daftar opsi yang disediakan.
+5. Untuk boolean: jawab persis "Ya" atau "Tidak".
 6. Kembalikan HANYA JSON murni (array objek) tanpa markdown.
 
 Format JSON:
 [
   {
-    "persona_profile": "Karyawan swasta, 28 th",
+    "persona_profile": "Mahasiswa PAUD, 21 th, semester 6",
     "persona_sentiment": "positive",
     "answers": {
       "question_id": "jawaban"
@@ -152,7 +166,7 @@ Format JSON:
 
         const response = await ai.models.generateContent({
           model: 'gemini-1.5-flash',
-          contents: `${systemPrompt}\n\nTopik Survei: ${survey.title}\nDeskripsi: ${survey.description}\n\nDaftar Pertanyaan:\n${questionPrompt}\n\nBuat ${geminiBatchSize} responden sekarang dalam format JSON murni:`,
+          contents: `${systemPrompt}\n\nTopik Survei: ${survey.title}\nDeskripsi & Target: ${survey.description}\n\nDaftar Pertanyaan:\n${questionPrompt}\n\nBuat ${geminiBatchSize} responden sekarang dalam format JSON murni:`,
         });
 
         const responseText = response.text || '';
