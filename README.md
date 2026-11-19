@@ -1,36 +1,89 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SimSurvei — Synthetic Survey & Bot Response Simulator
 
-## Getting Started
+Aplikasi kuesioner dan simulasi riset dengan pengisi otomatis (**Bot AI**) berbasis **Gemini API** dan database **Supabase**, dirancang dengan visualisasi data dinamis dan estetika **Anti-Slop** (`elayadesign/ai-design-skills`).
 
-First, run the development server:
+---
 
+## 🌟 Fitur Utama
+
+1. **Form / Questionnaire Builder Fleksibel:**
+   - Pertanyaan Pilihan Ganda (A, B, C, D...)
+   - Pertanyaan Benar / Salah (Ya / Tidak)
+   - Pertanyaan Isian Bebas (Kualitatif / Teks Pendapat)
+   - Template riset siap pakai (Layanan Kampus, E-Commerce, dll.)
+
+2. **Mesin Bot Responden Berbasis Gemini Flash & Smart Batching:**
+   - **Aman Rate-Limit (15 RPM):** Menghasilkan 5–10 persona responden Indonesia unik dalam 1 kali panggilan AI. Untuk 50–100 responden hanya butuh 10–12 panggilan API (~2-3 menit pengerjaan, jauh di bawah batas 1 jam).
+   - **Variasi Persona & Sentimen:** Profil usia, pekerjaan, dan sikap (positif, netral, kritis).
+   - **Teks Alami (Anti-Slop):** Respons isian bebas terdengar seperti ketikan manusia asli, bukan bahasa AI generik/kaku.
+
+3. **Distribusi Waktu Realistis (Jendela H+0 s/d H+7):**
+   - Timestamp pengisian (`submitted_at`) diacak realistis dalam rentang tanggal yang Anda tentukan (pukul 08:00–22:00).
+   - Dilengkapi grafik linimasa **Area Chart** yang menampilkan tren akumulasi dan laju pengisian harian.
+
+4. **Dashboard Visualisasi Dinamis:**
+   - Admin dapat mengganti tipe grafik secara instan per pertanyaan:
+     - **Diagram Batang Vertikal (Bar)**
+     - **Diagram Batang Horizontal**
+     - **Diagram Donat (Donut)**
+     - **Diagram Lingkaran (Pie)**
+   - Feed khusus isian bebas dengan pencarian dan filter sentimen.
+   - **Ekspor Data ke CSV:** Satu klik untuk download seluruh data responden & jawaban mentah untuk analisis SPSS/Excel.
+
+5. **Arsitektur Dual-Mode (Supabase + Local Mock Storage):**
+   - Jika Supabase belum dikonfigurasi, aplikasi tetap langsung jalan 100% menggunakan Local Storage bawaan browser! Begitu kredensial Supabase dimasukkan di `.env.local`, data otomatis sinkron ke Supabase Cloud.
+
+---
+
+## 🚀 Panduan Setup & Menjalankan
+
+### 1. Masuk ke Direktori Proyek
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cd C:\Users\Meee\.gemini\antigravity\scratch\synthetic-survey-sim
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. Konfigurasi Environment Variable (`.env.local`)
+Salin file `.env.example` menjadi `.env.local`:
+```bash
+cp .env.example .env.local
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Isi variabel berikut:
+```env
+# Supabase (dari Project Settings -> API di dashboard Supabase)
+NEXT_PUBLIC_SUPABASE_URL=https://xxxxxxxxxxxxxxxxxxxx.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# Gemini API (simpan key hanya di server; jangan gunakan prefix NEXT_PUBLIC_)
+GEMINI_API_KEY=AIzaSy...
+NEXT_PUBLIC_GEMINI_CONFIGURED=true
+```
+*(Catatan: Jika API key belum diisi, sistem otomatis beralih ke mode heuristik cerdas offline sehingga Anda tetap bisa mencoba aplikasi tanpa hambatan).*
 
-## Learn More
+### 3. Setup Database Supabase
+Buka **Supabase Dashboard** -> Proyek Anda -> **SQL Editor** -> Jalankan isi file [`supabase/schema.sql`](./supabase/schema.sql).
 
-To learn more about Next.js, take a look at the following resources:
+### 4. Jalankan Server Development
+```bash
+npm run dev
+```
+Buka browser di: `http://localhost:3000`
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 5. Build untuk Produksi
+```bash
+npm run build
+npm start
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
+## ☁️ Deploy ke Vercel
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Push folder proyek ini ke repository GitHub Anda (`git init`, `git add .`, `git commit -m "feat: initial commit"`, `git push`).
+2. Buka [vercel.com](https://vercel.com) -> **Add New Project** -> Pilih repository.
+3. Di bagian **Environment Variables**, tambahkan:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `GEMINI_API_KEY`
+   - `NEXT_PUBLIC_GEMINI_CONFIGURED=true`
+4. Klik **Deploy**!
