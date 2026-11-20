@@ -99,13 +99,19 @@ export default function CreateSurveyPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const now = new Date();
-  const plus7Days = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  const plus2Days = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000);
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [targetRespondents, setTargetRespondents] = useState(35);
+  const [targetRespondents, setTargetRespondents] = useState(100);
   const [startDate, setStartDate] = useState(now.toISOString().split('T')[0]);
-  const [endDate, setEndDate] = useState(plus7Days.toISOString().split('T')[0]);
+  const [endDate, setEndDate] = useState(plus2Days.toISOString().split('T')[0]);
+
+  const setDurationDays = (days: number) => {
+    const start = new Date(startDate);
+    const end = new Date(start.getTime() + days * 24 * 60 * 60 * 1000);
+    setEndDate(end.toISOString().split('T')[0]);
+  };
 
   const [questions, setQuestions] = useState<QuestionDraft[]>([
     {
@@ -412,19 +418,38 @@ export default function CreateSurveyPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
             <div>
-              <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1 flex items-center gap-1.5">
-                <Users className="h-3.5 w-3.5 text-neutral-400" />
-                Target Responden Otomatis
+              <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Users className="h-3.5 w-3.5 text-neutral-400" />
+                  Target Responden
+                </span>
+                <span className="text-[10px] font-mono text-neutral-400">Maks. 5000</span>
               </label>
               <input
                 type="number"
                 min="5"
-                max="200"
+                max="5000"
                 required
                 value={targetRespondents}
                 onChange={(e) => setTargetRespondents(parseInt(e.target.value) || 10)}
                 className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-xs font-mono text-neutral-900 focus:outline-none dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-100"
               />
+              <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+                {[50, 100, 500, 1000, 2000].map((num) => (
+                  <button
+                    key={num}
+                    type="button"
+                    onClick={() => setTargetRespondents(num)}
+                    className={`text-[10px] font-mono px-1.5 py-0.5 rounded border transition-all ${
+                      targetRespondents === num
+                        ? 'bg-neutral-900 text-white dark:bg-neutral-100 dark:text-neutral-900 font-bold border-transparent'
+                        : 'border-neutral-200 dark:border-neutral-800 text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-200'
+                    }`}
+                  >
+                    {num >= 1000 ? `${num / 1000}k` : num}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div>
@@ -442,9 +467,12 @@ export default function CreateSurveyPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1 flex items-center gap-1.5">
-                <Calendar className="h-3.5 w-3.5 text-neutral-400" />
-                Batas Selesai (+7 Hari)
+              <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Calendar className="h-3.5 w-3.5 text-neutral-400" />
+                  Batas Selesai
+                </span>
+                <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 font-medium">Rentang Waktu</span>
               </label>
               <input
                 type="date"
@@ -453,7 +481,35 @@ export default function CreateSurveyPage() {
                 onChange={(e) => setEndDate(e.target.value)}
                 className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-xs font-mono text-neutral-900 focus:outline-none dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-100"
               />
+              <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setDurationDays(2)}
+                  className="text-[10px] font-mono px-2 py-0.5 rounded border border-emerald-300 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800 font-medium"
+                >
+                  ⚡ +2 Hari (Aman Token)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDurationDays(7)}
+                  className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-neutral-200 dark:border-neutral-800 text-neutral-500 hover:text-neutral-900"
+                >
+                  +7 Hari
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDurationDays(14)}
+                  className="text-[10px] font-mono px-1.5 py-0.5 rounded border border-neutral-200 dark:border-neutral-800 text-neutral-500 hover:text-neutral-900"
+                >
+                  +14 Hari
+                </button>
+              </div>
             </div>
+          </div>
+
+          <div className="text-[11px] text-neutral-500 leading-relaxed bg-neutral-50 dark:bg-neutral-950/70 p-2.5 rounded-lg border border-neutral-200 dark:border-neutral-800 flex items-center gap-2">
+            <span className="text-emerald-500 font-bold shrink-0">🛡️ Proteksi Kuota API:</span>
+            <span>Untuk volume besar (hingga 2.000+ data), sistem menggunakan <strong>Hybrid Smart Seed</strong> dan <strong>Bulk Chunk Insert</strong> ke Supabase sehingga token API tetap aman dan proses selesai dalam hitungan detik.</span>
           </div>
         </div>
 

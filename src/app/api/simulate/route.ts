@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { survey, questions, count }: { survey: Survey; questions: Question[]; count: number } = body;
-    const targetCount = Math.max(1, Math.min(300, Number(count) || 30));
+    const targetCount = Math.max(1, Math.min(5000, Number(count) || 30));
 
     const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
     const allRespondents: Array<{

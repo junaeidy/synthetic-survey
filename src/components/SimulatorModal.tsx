@@ -123,8 +123,8 @@ export default function SimulatorModal({
               <label className="block text-xs font-medium text-neutral-700 dark:text-neutral-300 mb-1.5">
                 Target Jumlah Responden ($N$)
               </label>
-              <div className="flex items-center gap-2">
-                {[20, 50, 100].map((num) => (
+              <div className="flex items-center gap-2 flex-wrap">
+                {[50, 100, 500, 1000, 2000].map((num) => (
                   <button
                     key={num}
                     type="button"
@@ -135,13 +135,13 @@ export default function SimulatorModal({
                         : 'border-neutral-200 bg-neutral-50 text-neutral-700 hover:bg-neutral-100 dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-300'
                     }`}
                   >
-                    {num} orang
+                    {num >= 1000 ? `${num / 1000}k` : num} orang
                   </button>
                 ))}
                 <input
                   type="number"
                   min="1"
-                  max="300"
+                  max="5000"
                   value={targetCount}
                   onChange={(e) => setTargetCount(Math.max(1, parseInt(e.target.value) || 1))}
                   className="h-8 w-24 rounded-lg border border-neutral-200 bg-neutral-50 px-2 text-xs font-mono text-neutral-900 focus:outline-none dark:border-neutral-800 dark:bg-neutral-950 dark:text-neutral-100"

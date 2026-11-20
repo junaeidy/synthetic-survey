@@ -260,34 +260,67 @@ export async function saveSimulationBatch(
     saveLocalData(local);
   }
 
-  // Jika Supabase aktif, simpan juga ke Supabase
+  // Jika Supabase aktif, simpan juga ke Supabase dengan Bulk Chunk Insert
   const supabase = getSupabase();
   if (isSupabaseConfigured() && supabase) {
     try {
-      for (const res of generatedRespondents) {
-        const { data: respRow, error: respErr } = await supabase
-          .from('respondents')
-          .insert({
-            survey_id: surveyId,
-            persona_profile: res.persona_profile,
-            persona_sentiment: res.persona_sentiment,
-            submitted_at: res.submitted_at,
-          })
-          .select()
-          .single();
+      const respondentsToInsert: Array<{
+        id: string;
+        survey_id: string;
+        persona_profile: string;
+        persona_sentiment: 'positive' | 'neutral' | 'negative';
+        submitted_at: string;
+      }> = [];
 
-        if (!respErr && respRow) {
-          const answerRows = Object.entries(res.answers).map(([qId, ansVal]) => ({
+      const answersToInsert: Array<{
+        id: string;
+        survey_id: string;
+        respondent_id: string;
+        question_id: string;
+        answer_value: string;
+      }> = [];
+
+      for (let i = 0; i < generatedRespondents.length; i++) {
+        const res = generatedRespondents[i];
+        const respId =
+          typeof crypto !== 'undefined' && crypto.randomUUID
+            ? crypto.randomUUID()
+            : `resp-${Date.now()}-${i}-${Math.random().toString(36).substring(2, 8)}`;
+
+        respondentsToInsert.push({
+          id: respId,
+          survey_id: surveyId,
+          persona_profile: res.persona_profile,
+          persona_sentiment: res.persona_sentiment,
+          submitted_at: res.submitted_at,
+        });
+
+        for (const [qId, ansVal] of Object.entries(res.answers)) {
+          answersToInsert.push({
+            id:
+              typeof crypto !== 'undefined' && crypto.randomUUID
+                ? crypto.randomUUID()
+                : `ans-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
             survey_id: surveyId,
-            respondent_id: respRow.id,
+            respondent_id: respId,
             question_id: qId,
             answer_value: ansVal,
-          }));
-
-          if (answerRows.length > 0) {
-            await supabase.from('answers').insert(answerRows);
-          }
+          });
         }
+      }
+
+      // Bulk insert respondents per 500 baris
+      for (let i = 0; i < respondentsToInsert.length; i += 500) {
+        const chunk = respondentsToInsert.slice(i, i + 500);
+        const { error: respErr } = await supabase.from('respondents').insert(chunk);
+        if (respErr) throw respErr;
+      }
+
+      // Bulk insert answers per 1000 baris
+      for (let i = 0; i < answersToInsert.length; i += 1000) {
+        const chunk = answersToInsert.slice(i, i + 1000);
+        const { error: ansErr } = await supabase.from('answers').insert(chunk);
+        if (ansErr) throw ansErr;
       }
 
       await supabase
