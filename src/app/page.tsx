@@ -135,6 +135,9 @@ export default function HomePage() {
                     <li>
                       Pastikan skrip SQL di file <code className="font-mono">supabase/schema.sql</code> sudah dijalankan di Supabase SQL Editor.
                     </li>
+                    <li>
+                      Jika muncul <strong>Kode: 42501 (Permission Denied)</strong>: Jalankan perintah <code className="font-mono bg-neutral-100 dark:bg-neutral-800 px-1 py-0.5 rounded">GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated;</code> di Supabase SQL Editor.
+                    </li>
                   </ul>
                 </div>
                 <button

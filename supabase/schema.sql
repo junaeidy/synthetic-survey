@@ -88,3 +88,13 @@ CREATE POLICY "Allow public delete respondents" ON respondents FOR DELETE USING 
 CREATE POLICY "Allow public read answers" ON answers FOR SELECT USING (true);
 CREATE POLICY "Allow public insert answers" ON answers FOR INSERT WITH CHECK (true);
 CREATE POLICY "Allow public delete answers" ON answers FOR DELETE USING (true);
+
+-- 9. Grants Hak Akses untuk Role 'anon' dan 'authenticated' (Mencegah Error 42501 Permission Denied)
+GRANT USAGE ON SCHEMA public TO anon, authenticated;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated;
+GRANT ALL ON ALL ROUTINES IN SCHEMA public TO anon, authenticated;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON ROUTINES TO anon, authenticated;

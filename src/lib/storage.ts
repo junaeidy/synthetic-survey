@@ -19,6 +19,12 @@ function formatSupabaseError(error: unknown, context: string): Error {
     );
   }
 
+  if (code === '42501' || msg.includes('permission denied') || msg.includes('42501')) {
+    return new Error(
+      `[Supabase 42501 Permission Denied] Role 'anon' belum memiliki izin akses ke tabel Supabase. Silakan buka Supabase SQL Editor dan jalankan: GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated;`
+    );
+  }
+
   return new Error(`[Supabase Error di ${context}]: ${msg} ${code ? `(Kode: ${code})` : ''}`);
 }
 
