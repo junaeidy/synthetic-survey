@@ -11,17 +11,27 @@ import {
   ArrowRight,
   Sparkles,
   Layers,
+  AlertTriangle,
+  RefreshCw,
 } from 'lucide-react';
 
 export default function HomePage() {
   const [surveys, setSurveys] = useState<Survey[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const loadData = async () => {
     setLoading(true);
-    const data = await fetchAllSurveys();
-    setSurveys(data);
-    setLoading(false);
+    setError(null);
+    try {
+      const data = await fetchAllSurveys();
+      setSurveys(data);
+    } catch (err: unknown) {
+      console.error('Error fetching surveys from Supabase:', err);
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -99,11 +109,45 @@ export default function HomePage() {
             Daftar Kuesioner Riset
           </h2>
           <span className="text-xs font-mono text-neutral-400">
-            Menampilkan {surveys.length} angket
+            {error ? 'Status: Error' : `Menampilkan ${surveys.length} angket`}
           </span>
         </div>
 
-        {loading ? (
+        {error ? (
+          <div className="rounded-2xl border border-rose-300 bg-rose-50/70 p-6 dark:border-rose-900 dark:bg-rose-950/30">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
+              <div className="space-y-2 flex-1">
+                <h3 className="text-sm font-semibold text-rose-900 dark:text-rose-200">
+                  Gagal Membaca Data dari Supabase
+                </h3>
+                <p className="text-xs text-rose-800 dark:text-rose-300 font-mono bg-rose-100/60 dark:bg-rose-900/40 p-2.5 rounded-lg border border-rose-200 dark:border-rose-800 break-words">
+                  {error}
+                </p>
+                <div className="text-xs text-neutral-600 dark:text-neutral-400 space-y-1 pt-1">
+                  <p>
+                    <strong>Solusi yang perlu diperiksa:</strong>
+                  </p>
+                  <ul className="list-disc pl-4 space-y-0.5 text-[11px]">
+                    <li>
+                      Pastikan <code className="font-mono font-semibold">NEXT_PUBLIC_SUPABASE_ANON_KEY</code> di file <code className="font-mono">.env.local</code> atau Vercel memakai token JWT (diawali <span className="font-mono font-bold text-neutral-900 dark:text-neutral-100">eyJhbGciOi...</span>), bukan yang berawalan <code className="text-rose-600">sb_publishable_</code>.
+                    </li>
+                    <li>
+                      Pastikan skrip SQL di file <code className="font-mono">supabase/schema.sql</code> sudah dijalankan di Supabase SQL Editor.
+                    </li>
+                  </ul>
+                </div>
+                <button
+                  onClick={loadData}
+                  className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-700 text-white hover:bg-rose-800 text-xs font-medium transition-all"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  <span>Coba Lagi Hubungkan ke Supabase</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : loading ? (
           <div className="py-16 text-center text-xs font-mono text-neutral-400">
             Memuat daftar survei...
           </div>

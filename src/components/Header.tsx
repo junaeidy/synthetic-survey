@@ -4,39 +4,18 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { isSupabaseConfigured } from '@/lib/supabase';
-import { syncLocalDataToSupabase } from '@/lib/storage';
-import { Database, Sparkles, PlusCircle, BarChart3, Layers, AlertCircle, CheckCircle2, RefreshCw, X } from 'lucide-react';
+import { Database, Sparkles, PlusCircle, BarChart3, Layers, AlertCircle, CheckCircle2, X } from 'lucide-react';
 
 export default function Header() {
   const pathname = usePathname();
   const [supabaseReady, setSupabaseReady] = useState(false);
   const [geminiReady, setGeminiReady] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [syncStatus, setSyncStatus] = useState<string | null>(null);
 
   useEffect(() => {
     setSupabaseReady(isSupabaseConfigured());
     setGeminiReady(process.env.NEXT_PUBLIC_GEMINI_CONFIGURED === 'true');
   }, []);
-
-  const handleSync = async () => {
-    setIsSyncing(true);
-    setSyncStatus(null);
-    try {
-      const res = await syncLocalDataToSupabase();
-      if (res.success) {
-        setSyncStatus(`Berhasil menyinkronkan ${res.count} kuesioner ke Supabase Cloud!`);
-        setTimeout(() => window.location.reload(), 1500);
-      } else {
-        setSyncStatus(`Gagal: ${res.error}`);
-      }
-    } catch (err: unknown) {
-      setSyncStatus(`Error: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setIsSyncing(false);
-    }
-  };
 
   return (
     <>
@@ -79,11 +58,11 @@ export default function Header() {
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-mono border transition-all cursor-pointer ${
                 supabaseReady
                   ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800'
-                  : 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800'
+                  : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-800'
               }`}
             >
               <Database className="h-3 w-3" />
-              <span>{supabaseReady ? 'Supabase Active' : 'Local Storage Mode'}</span>
+              <span>{supabaseReady ? 'Supabase Connected' : 'Supabase Error / Setup'}</span>
             </button>
 
             {/* Gemini Status Pill */}
@@ -110,7 +89,7 @@ export default function Header() {
         </div>
       </header>
 
-      {/* Info & Sync Modal */}
+      {/* Info & Diagnostics Modal */}
       {showInfoModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
           <div className="relative w-full max-w-lg rounded-2xl border border-neutral-200 bg-white p-6 shadow-2xl dark:border-neutral-800 dark:bg-neutral-900">
@@ -122,69 +101,51 @@ export default function Header() {
             </button>
 
             <div className="flex items-center gap-3 pb-3 border-b border-neutral-100 dark:border-neutral-800">
-              <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${supabaseReady ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
+              <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${supabaseReady ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
                 <Database className="h-5 w-5" />
               </div>
               <div>
                 <h2 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">
-                  Status Database: {supabaseReady ? 'Supabase Cloud Aktif' : 'Penyimpanan Lokal (Browser)'}
+                  Status Database Supabase
                 </h2>
                 <p className="text-xs text-neutral-500 font-mono">
-                  {supabaseReady ? 'Data tersimpan di PostgreSQL Supabase' : 'Data tersimpan di Local Storage Browser'}
+                  {supabaseReady ? 'Terhubung langsung ke Supabase PostgreSQL' : 'Koneksi Supabase Memerlukan Konfigurasi Key'}
                 </p>
               </div>
             </div>
 
             <div className="py-4 space-y-3 text-xs leading-relaxed text-neutral-700 dark:text-neutral-300">
               {supabaseReady ? (
-                <>
-                  <div className="flex items-center gap-2 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
-                    <CheckCircle2 className="h-4 w-4 shrink-0" />
-                    <span>Supabase Cloud terhubung! Semua kuesioner baru akan otomatis tersimpan langsung ke tabel Supabase.</span>
-                  </div>
-                  <p>
-                    Jika sebelumnya Anda membuat kuesioner saat dalam mode offline/lokal, Anda dapat mengunggahnya sekarang ke Supabase:
-                  </p>
-                  <button
-                    onClick={handleSync}
-                    disabled={isSyncing}
-                    className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-neutral-900 text-white hover:bg-neutral-800 dark:bg-neutral-100 dark:text-neutral-900 font-semibold transition-all disabled:opacity-50"
-                  >
-                    <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
-                    <span>{isSyncing ? 'Menyinkronkan data...' : 'Sinkronkan Data Lokal ke Supabase Cloud'}</span>
-                  </button>
-                  {syncStatus && (
-                    <p className="text-center font-mono text-[11px] text-emerald-600 dark:text-emerald-400">
-                      {syncStatus}
-                    </p>
-                  )}
-                </>
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                  <CheckCircle2 className="h-4 w-4 shrink-0" />
+                  <span>Koneksi Supabase Cloud aktif. Semua kuesioner dan simulasi responden disimpan langsung ke database Supabase Anda. Tidak ada penyimpanan offline / lokal.</span>
+                </div>
               ) : (
                 <>
-                  <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                  <div className="flex items-start gap-2 p-3 rounded-lg bg-rose-50 dark:bg-rose-950/40 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-800">
                     <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
                     <div>
-                      <strong className="block font-semibold">Mengapa belum masuk ke Supabase?</strong>
-                      <span>Data yang Anda buat saat ini <strong>tersimpan aman di memori browser (Local Storage)</strong>, sehingga grafik dan kuesioner tetap bisa dibuka dan diekspor ke CSV kapan saja.</span>
+                      <strong className="block font-semibold">Koneksi Supabase Gagal / Belum Benar</strong>
+                      <span>Aplikasi hanya menyimpan data ke Supabase Cloud (tidak menggunakan local storage). Jika key belum valid, operasi database akan langsung menampilkan pesan error.</span>
                     </div>
                   </div>
 
                   <div className="space-y-2 pt-1">
                     <p className="font-semibold text-neutral-900 dark:text-neutral-100">
-                      Cara Menghubungkan ke Supabase Cloud:
+                      Cara Memperbaiki Kunci Anon Supabase:
                     </p>
-                    <ol className="list-decimal pl-4 space-y-1 text-neutral-600 dark:text-neutral-400">
+                    <ol className="list-decimal pl-4 space-y-1.5 text-neutral-600 dark:text-neutral-400">
                       <li>Buka dashboard Supabase: <span className="font-mono text-[11px] bg-neutral-100 dark:bg-neutral-800 px-1 py-0.5 rounded">Project Settings → API</span>.</li>
                       <li>
-                        Di bagian <strong>Project API keys</strong>, salin kunci baris <strong>anon public</strong> (kunci panjang yang diawali teks <span className="font-mono text-[11px] font-bold text-neutral-800 dark:text-neutral-200">eyJhbGciOi...</span>, <em>bukan</em> yang berawalan <code className="text-rose-500">sb_publishable_</code>).
+                        Di bagian <strong>Project API keys</strong>, salin kunci baris <strong>anon public</strong> (kunci panjang berformat JWT yang diawali teks <span className="font-mono text-[11px] font-bold text-neutral-800 dark:text-neutral-200">eyJhbGciOiJIUzI1Ni...</span>, <em>bukan</em> yang berawalan <code className="text-rose-500">sb_publishable_</code>).
                       </li>
                       <li>
-                        Buka file <span className="font-mono text-[11px] bg-neutral-100 dark:bg-neutral-800 px-1 py-0.5 rounded">.env.local</span> di folder proyek Anda dan perbarui baris:
+                        Buka file <span className="font-mono text-[11px] bg-neutral-100 dark:bg-neutral-800 px-1 py-0.5 rounded">.env.local</span> dan Environment Variables di Vercel, lalu perbarui baris:
                         <div className="mt-1 p-2 rounded bg-neutral-950 text-neutral-200 font-mono text-[11px] overflow-x-auto">
                           NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1Ni...
                         </div>
                       </li>
-                      <li>Simpan file dan restart server (<code className="font-mono">npm run dev</code>). Status akan berubah menjadi <strong className="text-emerald-600">Supabase Active</strong>!</li>
+                      <li>Pastikan skrip tabel <code className="font-mono">supabase/schema.sql</code> sudah dijalankan di Supabase SQL Editor.</li>
                     </ol>
                   </div>
                 </>

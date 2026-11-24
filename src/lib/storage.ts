@@ -1,143 +1,73 @@
 import { Survey, Question, Respondent, Answer, SurveyAnalytics, QuestionType } from '@/types/survey';
-import { getSupabase, isSupabaseConfigured } from './supabase';
+import { getSupabase } from './supabase';
 import { GeneratedRespondent } from './gemini';
 
-const LOCAL_STORAGE_KEY = 'synthetic_surveys_data_v1';
+function formatSupabaseError(error: unknown, context: string): Error {
+  const errObj = error as { message?: string; code?: string | number; status?: string | number } | null;
+  const msg = errObj?.message || String(error);
+  const code = errObj?.code || errObj?.status || '';
 
-// Contoh data default riset jika database masih kosong
-const SAMPLE_SURVEYS: Array<Survey & { questions: Question[]; respondents: Respondent[]; answers: Answer[] }> = [
-  {
-    id: 'demo-survey-1',
-    title: 'Evaluasi Adopsi Tools AI dalam Produktivitas Riset Akademik',
-    description: 'Survei untuk mengukur frekuensi penggunaan, persepsi keandalan, dan efektivitas asisten AI bagi kalangan akademisi.',
-    target_respondents: 40,
-    start_date: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(),
-    end_date: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000).toISOString(),
-    status: 'completed',
-    created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-    questions: [
-      {
-        id: 'q1',
-        survey_id: 'demo-survey-1',
-        question_text: 'Berapa frekuensi Anda menggunakan asisten AI untuk membantu riset?',
-        question_type: 'multiple_choice',
-        options: ['Setiap Hari', 'Beberapa Kali Seminggu', 'Jarang', 'Belum Pernah'],
-        order_index: 0,
-      },
-      {
-        id: 'q2',
-        survey_id: 'demo-survey-1',
-        question_text: 'Apakah hasil bantuan AI meningkatkan efisiensi waktu pengerjaan tugas/riset Anda?',
-        question_type: 'boolean',
-        options: ['Ya', 'Tidak'],
-        order_index: 1,
-      },
-      {
-        id: 'q3',
-        survey_id: 'demo-survey-1',
-        question_text: 'Apa kendala atau masukan utama Anda terkait penggunaan asisten AI saat ini?',
-        question_type: 'text',
-        order_index: 2,
-      },
-    ],
-    respondents: [],
-    answers: [],
-  },
-];
+  if (msg.includes('Invalid API key') || code === 'PGRST301' || msg.includes('JWT') || code === 401) {
+    return new Error(
+      `[Supabase 401 Unauthorized] Kunci API tidak valid di ${context}. Kunci NEXT_PUBLIC_SUPABASE_ANON_KEY harus berupa JWT token (diawali 'eyJ...'), bukan yang berawalan 'sb_publishable_'.`
+    );
+  }
 
-// Helper Local Storage
-function getLocalData(): typeof SAMPLE_SURVEYS {
-  if (typeof window === 'undefined') return SAMPLE_SURVEYS;
-  const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
-  if (!raw) {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(SAMPLE_SURVEYS));
-    return SAMPLE_SURVEYS;
+  if (msg.includes('relation') && msg.includes('does not exist')) {
+    return new Error(
+      `[Supabase Table Missing] Tabel belum dibuat di database Supabase Anda. Silakan jalankan seluruh skrip 'supabase/schema.sql' di SQL Editor dashboard Supabase Anda.`
+    );
   }
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return SAMPLE_SURVEYS;
-  }
-}
 
-function saveLocalData(data: typeof SAMPLE_SURVEYS) {
-  if (typeof window !== 'undefined') {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(data));
-  }
+  return new Error(`[Supabase Error di ${context}]: ${msg} ${code ? `(Kode: ${code})` : ''}`);
 }
 
 export async function fetchAllSurveys(): Promise<Survey[]> {
   const supabase = getSupabase();
-  if (isSupabaseConfigured() && supabase) {
-    try {
-      const { data: surveys, error } = await supabase
-        .from('surveys')
-        .select(`
-          *,
-          questions (*),
-          respondents (count)
-        `)
-        .order('created_at', { ascending: false });
+  const { data: surveys, error } = await supabase
+    .from('surveys')
+    .select(`
+      *,
+      questions (*),
+      respondents (count)
+    `)
+    .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      if (surveys) {
-        return (surveys as Array<Survey & { respondents?: Array<{ count: number }> }>).map((s) => ({
-          ...s,
-          respondents_count: s.respondents?.[0]?.count || 0,
-        }));
-      }
-    } catch (err) {
-      console.warn('Supabase fetch failed, falling back to local storage:', err);
-    }
+  if (error) {
+    throw formatSupabaseError(error, 'fetchAllSurveys');
   }
 
-  const local = getLocalData();
-  return local.map((s) => ({
-    id: s.id,
-    title: s.title,
-    description: s.description,
-    target_respondents: s.target_respondents,
-    start_date: s.start_date,
-    end_date: s.end_date,
-    status: s.status,
-    created_at: s.created_at,
-    questions: s.questions,
-    respondents_count: s.respondents?.length || 0,
-  }));
+  return (surveys || []).map((s) => {
+    const item = s as Survey & { respondents?: Array<{ count: number }> };
+    return {
+      ...item,
+      respondents_count: item.respondents?.[0]?.count || 0,
+    };
+  });
 }
 
 export async function fetchSurveyById(id: string): Promise<(Survey & { questions: Question[] }) | null> {
   const supabase = getSupabase();
-  if (isSupabaseConfigured() && supabase) {
-    try {
-      const { data: survey, error } = await supabase
-        .from('surveys')
-        .select(`
-          *,
-          questions (*)
-        `)
-        .eq('id', id)
-        .single();
+  const { data: survey, error } = await supabase
+    .from('surveys')
+    .select(`
+      *,
+      questions (*)
+    `)
+    .eq('id', id)
+    .single();
 
-      if (error) throw error;
-      if (survey) {
-        survey.questions = (survey.questions || []).sort(
-          (a: Question, b: Question) => a.order_index - b.order_index
-        );
-        return survey;
-      }
-    } catch (err) {
-      console.warn('Supabase fetchSurveyById error:', err);
-    }
+  if (error) {
+    throw formatSupabaseError(error, `fetchSurveyById(${id})`);
   }
 
-  const local = getLocalData();
-  const found = local.find((s) => s.id === id);
-  if (!found) return null;
-  return {
-    ...found,
-    questions: found.questions.sort((a, b) => a.order_index - b.order_index),
-  };
+  if (!survey) return null;
+
+  survey.questions = (survey.questions || []).sort(
+    (a: Question, b: Question) => a.order_index - b.order_index
+  );
+
+  return survey;
 }
 
 export async function createNewSurvey(
@@ -154,186 +84,123 @@ export async function createNewSurvey(
     options?: string[];
   }>
 ): Promise<string> {
-  const newSurveyId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `srv-${Date.now()}`;
   const supabase = getSupabase();
 
-  // Selalu siapkan & simpan ke Local Storage terlebih dahulu agar 100% aman
-  const formattedQuestions: Question[] = questions.map((q, idx) => ({
-    id: `q-${Date.now()}-${idx}`,
-    survey_id: newSurveyId,
+  // 1. Simpan Kuesioner ke tabel 'surveys' Supabase
+  const { data: srv, error: srvErr } = await supabase
+    .from('surveys')
+    .insert({
+      title: surveyData.title,
+      description: surveyData.description,
+      target_respondents: surveyData.target_respondents,
+      start_date: surveyData.start_date,
+      end_date: surveyData.end_date,
+      status: 'draft',
+    })
+    .select()
+    .single();
+
+  if (srvErr) {
+    throw formatSupabaseError(srvErr, 'Insert surveys');
+  }
+
+  // 2. Simpan Butir Pertanyaan ke tabel 'questions' Supabase
+  const qRows = questions.map((q, idx) => ({
+    survey_id: srv.id,
     question_text: q.question_text,
     question_type: q.question_type,
     options: q.options || [],
     order_index: idx,
-    created_at: new Date().toISOString(),
   }));
 
-  const newSurvey: Survey & { questions: Question[]; respondents: Respondent[]; answers: Answer[] } = {
-    id: newSurveyId,
-    title: surveyData.title,
-    description: surveyData.description,
-    target_respondents: surveyData.target_respondents,
-    start_date: surveyData.start_date,
-    end_date: surveyData.end_date,
-    status: 'draft',
-    created_at: new Date().toISOString(),
-    questions: formattedQuestions,
-    respondents: [],
-    answers: [],
-  };
-
-  const local = getLocalData();
-  local.unshift(newSurvey);
-  saveLocalData(local);
-
-  // Jika Supabase aktif, coba simpan juga ke Supabase
-  if (isSupabaseConfigured() && supabase) {
-    try {
-      const { data: srv, error: srvErr } = await supabase
-        .from('surveys')
-        .insert({
-          title: surveyData.title,
-          description: surveyData.description,
-          target_respondents: surveyData.target_respondents,
-          start_date: surveyData.start_date,
-          end_date: surveyData.end_date,
-          status: 'draft',
-        })
-        .select()
-        .single();
-
-      if (!srvErr && srv) {
-        const qRows = formattedQuestions.map((q, idx) => ({
-          id: q.id,
-          survey_id: srv.id,
-          question_text: q.question_text,
-          question_type: q.question_type,
-          options: q.options || [],
-          order_index: idx,
-        }));
-        await supabase.from('questions').insert(qRows);
-        return srv.id;
-      }
-    } catch (err) {
-      console.warn('Supabase createNewSurvey error, using local storage id:', err);
-    }
+  const { error: qErr } = await supabase.from('questions').insert(qRows);
+  if (qErr) {
+    throw formatSupabaseError(qErr, 'Insert questions');
   }
 
-  return newSurveyId;
+  return srv.id;
 }
 
 export async function saveSimulationBatch(
   surveyId: string,
   generatedRespondents: GeneratedRespondent[]
 ): Promise<void> {
-  // Simpan ke Local Storage
-  const local = getLocalData();
-  const target = local.find((s) => s.id === surveyId);
-  if (target) {
-    target.status = 'completed';
-    if (!target.respondents) target.respondents = [];
-    if (!target.answers) target.answers = [];
+  const supabase = getSupabase();
 
-    generatedRespondents.forEach((res, idx) => {
-      const respId = `resp-${Date.now()}-${idx}-${Math.random().toString(36).substring(2, 6)}`;
-      target.respondents.push({
-        id: respId,
-        survey_id: surveyId,
-        persona_profile: res.persona_profile,
-        persona_sentiment: res.persona_sentiment,
-        submitted_at: res.submitted_at,
-        created_at: new Date().toISOString(),
-      });
+  const respondentsToInsert: Array<{
+    id: string;
+    survey_id: string;
+    persona_profile: string;
+    persona_sentiment: 'positive' | 'neutral' | 'negative';
+    submitted_at: string;
+  }> = [];
 
-      Object.entries(res.answers).forEach(([qId, ansVal]) => {
-        target.answers.push({
-          id: `ans-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-          survey_id: surveyId,
-          respondent_id: respId,
-          question_id: qId,
-          answer_value: ansVal,
-          created_at: new Date().toISOString(),
-        });
-      });
+  const answersToInsert: Array<{
+    id: string;
+    survey_id: string;
+    respondent_id: string;
+    question_id: string;
+    answer_value: string;
+  }> = [];
+
+  for (let i = 0; i < generatedRespondents.length; i++) {
+    const res = generatedRespondents[i];
+    const respId =
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `resp-${Date.now()}-${i}-${Math.random().toString(36).substring(2, 8)}`;
+
+    respondentsToInsert.push({
+      id: respId,
+      survey_id: surveyId,
+      persona_profile: res.persona_profile,
+      persona_sentiment: res.persona_sentiment,
+      submitted_at: res.submitted_at,
     });
 
-    saveLocalData(local);
-  }
-
-  // Jika Supabase aktif, simpan juga ke Supabase dengan Bulk Chunk Insert
-  const supabase = getSupabase();
-  if (isSupabaseConfigured() && supabase) {
-    try {
-      const respondentsToInsert: Array<{
-        id: string;
-        survey_id: string;
-        persona_profile: string;
-        persona_sentiment: 'positive' | 'neutral' | 'negative';
-        submitted_at: string;
-      }> = [];
-
-      const answersToInsert: Array<{
-        id: string;
-        survey_id: string;
-        respondent_id: string;
-        question_id: string;
-        answer_value: string;
-      }> = [];
-
-      for (let i = 0; i < generatedRespondents.length; i++) {
-        const res = generatedRespondents[i];
-        const respId =
+    for (const [qId, ansVal] of Object.entries(res.answers)) {
+      answersToInsert.push({
+        id:
           typeof crypto !== 'undefined' && crypto.randomUUID
             ? crypto.randomUUID()
-            : `resp-${Date.now()}-${i}-${Math.random().toString(36).substring(2, 8)}`;
-
-        respondentsToInsert.push({
-          id: respId,
-          survey_id: surveyId,
-          persona_profile: res.persona_profile,
-          persona_sentiment: res.persona_sentiment,
-          submitted_at: res.submitted_at,
-        });
-
-        for (const [qId, ansVal] of Object.entries(res.answers)) {
-          answersToInsert.push({
-            id:
-              typeof crypto !== 'undefined' && crypto.randomUUID
-                ? crypto.randomUUID()
-                : `ans-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
-            survey_id: surveyId,
-            respondent_id: respId,
-            question_id: qId,
-            answer_value: ansVal,
-          });
-        }
-      }
-
-      // Bulk insert respondents per 500 baris
-      for (let i = 0; i < respondentsToInsert.length; i += 500) {
-        const chunk = respondentsToInsert.slice(i, i + 500);
-        const { error: respErr } = await supabase.from('respondents').insert(chunk);
-        if (respErr) throw respErr;
-      }
-
-      // Bulk insert answers per 1000 baris
-      for (let i = 0; i < answersToInsert.length; i += 1000) {
-        const chunk = answersToInsert.slice(i, i + 1000);
-        const { error: ansErr } = await supabase.from('answers').insert(chunk);
-        if (ansErr) throw ansErr;
-      }
-
-      await supabase
-        .from('surveys')
-        .update({ status: 'completed' })
-        .eq('id', surveyId);
-    } catch (err) {
-      console.warn('Supabase saveSimulationBatch error, local storage saved:', err);
+            : `ans-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
+        survey_id: surveyId,
+        respondent_id: respId,
+        question_id: qId,
+        answer_value: ansVal,
+      });
     }
+  }
+
+  // Bulk insert respondents per batch 500 ke tabel 'respondents'
+  for (let i = 0; i < respondentsToInsert.length; i += 500) {
+    const chunk = respondentsToInsert.slice(i, i + 500);
+    const { error: respErr } = await supabase.from('respondents').insert(chunk);
+    if (respErr) {
+      throw formatSupabaseError(respErr, 'Insert respondents');
+    }
+  }
+
+  // Bulk insert answers per batch 1000 ke tabel 'answers'
+  for (let i = 0; i < answersToInsert.length; i += 1000) {
+    const chunk = answersToInsert.slice(i, i + 1000);
+    const { error: ansErr } = await supabase.from('answers').insert(chunk);
+    if (ansErr) {
+      throw formatSupabaseError(ansErr, 'Insert answers');
+    }
+  }
+
+  // Update status survei menjadi 'completed'
+  const { error: updateErr } = await supabase
+    .from('surveys')
+    .update({ status: 'completed' })
+    .eq('id', surveyId);
+
+  if (updateErr) {
+    throw formatSupabaseError(updateErr, 'Update survey status');
   }
 }
 
-// Fungsi utama: Buat angket dan LANGSUNG isi seluruh responden bot secara instan
 export async function createSurveyWithInstantResponses(
   surveyData: {
     title: string;
@@ -348,74 +215,66 @@ export async function createSurveyWithInstantResponses(
     options?: string[];
   }>
 ): Promise<string> {
-  // 1. Buat survei & pertanyaannya
+  // 1. Simpan kuesioner & pertanyaan langsung ke Supabase
   const surveyId = await createNewSurvey(surveyData, questions);
   const fullSurvey = await fetchSurveyById(surveyId);
 
-  if (fullSurvey) {
-    try {
-      // 2. Panggil API simulator untuk mengisi seluruh responden target secara otomatis
-      const simRes = await fetch('/api/simulate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          survey: fullSurvey,
-          questions: fullSurvey.questions,
-          count: surveyData.target_respondents,
-        }),
-      });
-
-      if (simRes.ok) {
-        const simData = await simRes.json();
-        if (simData.success && Array.isArray(simData.respondents)) {
-          // 3. Simpan jawaban responden
-          await saveSimulationBatch(surveyId, simData.respondents);
-        }
-      }
-    } catch (e) {
-      console.warn('Auto simulation error:', e);
-    }
+  if (!fullSurvey) {
+    throw new Error('Gagal memverifikasi kuesioner yang baru disimpan di Supabase.');
   }
+
+  // 2. Jalankan simulasi responden bot
+  const simRes = await fetch('/api/simulate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      survey: fullSurvey,
+      questions: fullSurvey.questions,
+      count: surveyData.target_respondents,
+    }),
+  });
+
+  if (!simRes.ok) {
+    throw new Error(`Gagal memanggil API simulasi responden (Status: ${simRes.status})`);
+  }
+
+  const simData = await simRes.json();
+  if (!simData.success || !Array.isArray(simData.respondents)) {
+    throw new Error(simData.error || 'Gagal menghasilkan data responden bot');
+  }
+
+  // 3. Simpan seluruh responden & jawaban langsung ke Supabase
+  await saveSimulationBatch(surveyId, simData.respondents);
 
   return surveyId;
 }
 
-export async function fetchSurveyAnalytics(surveyId: string): Promise<SurveyAnalytics | null> {
-  let survey: Survey | null = null;
-  let questions: Question[] = [];
-  let respondents: Respondent[] = [];
-  let answers: Answer[] = [];
-
+export async function fetchSurveyAnalytics(surveyId: string): Promise<SurveyAnalytics> {
   const supabase = getSupabase();
-  if (isSupabaseConfigured() && supabase) {
-    try {
-      const { data: srv } = await supabase.from('surveys').select('*').eq('id', surveyId).single();
-      const { data: qs } = await supabase.from('questions').select('*').eq('survey_id', surveyId).order('order_index');
-      const { data: resps } = await supabase.from('respondents').select('*').eq('survey_id', surveyId).order('submitted_at');
-      const { data: anss } = await supabase.from('answers').select('*').eq('survey_id', surveyId);
 
-      if (srv) {
-        survey = srv;
-        questions = qs || [];
-        respondents = resps || [];
-        answers = anss || [];
-      }
-    } catch (err) {
-      console.warn('Supabase fetchSurveyAnalytics error, falling back to local storage:', err);
-    }
+  const { data: srv, error: srvErr } = await supabase.from('surveys').select('*').eq('id', surveyId).single();
+  if (srvErr || !srv) {
+    throw formatSupabaseError(srvErr || new Error('Kuesioner tidak ditemukan'), `fetchSurveyAnalytics surveys (${surveyId})`);
   }
 
-  if (!survey) {
-    const local = getLocalData();
-    const found = local.find((s) => s.id === surveyId);
-    if (!found) return null;
-    survey = found;
-    questions = found.questions || [];
-    respondents = (found.respondents || []).sort(
-      (a, b) => new Date(a.submitted_at).getTime() - new Date(b.submitted_at).getTime()
-    );
-    answers = found.answers || [];
+  const { data: qs, error: qErr } = await supabase.from('questions').select('*').eq('survey_id', surveyId).order('order_index');
+  if (qErr) {
+    throw formatSupabaseError(qErr, `fetchSurveyAnalytics questions (${surveyId})`);
   }
+
+  const { data: resps, error: respErr } = await supabase.from('respondents').select('*').eq('survey_id', surveyId).order('submitted_at');
+  if (respErr) {
+    throw formatSupabaseError(respErr, `fetchSurveyAnalytics respondents (${surveyId})`);
+  }
+
+  const { data: anss, error: ansErr } = await supabase.from('answers').select('*').eq('survey_id', surveyId);
+  if (ansErr) {
+    throw formatSupabaseError(ansErr, `fetchSurveyAnalytics answers (${surveyId})`);
+  }
+
+  const questions: Question[] = qs || [];
+  const respondents: Respondent[] = resps || [];
+  const answers: Answer[] = anss || [];
 
   // Hitung Statistik per Pertanyaan
   const questionStats: SurveyAnalytics['questionStats'] = {};
@@ -492,82 +351,11 @@ export async function fetchSurveyAnalytics(surveyId: string): Promise<SurveyAnal
   });
 
   return {
-    survey,
+    survey: srv,
     questions,
     respondents,
     answers,
     questionStats,
     timelineData,
   };
-}
-
-export function getLocalSurveysCount(): number {
-  if (typeof window === 'undefined') return 0;
-  const local = getLocalData();
-  return local.length;
-}
-
-export async function syncLocalDataToSupabase(): Promise<{ success: boolean; count: number; error?: string }> {
-  const supabase = getSupabase();
-  if (!isSupabaseConfigured() || !supabase) {
-    return {
-      success: false,
-      count: 0,
-      error: 'Supabase belum terhubung. Pastikan NEXT_PUBLIC_SUPABASE_ANON_KEY di .env.local menggunakan format JWT (diawali eyJ...).',
-    };
-  }
-
-  const local = getLocalData();
-  let syncedCount = 0;
-
-  for (const s of local) {
-    try {
-      const { data: existing } = await supabase.from('surveys').select('id').eq('id', s.id).single();
-      if (!existing) {
-        const { error: srvErr } = await supabase.from('surveys').insert({
-          id: s.id,
-          title: s.title,
-          description: s.description,
-          target_respondents: s.target_respondents,
-          start_date: s.start_date,
-          end_date: s.end_date,
-          status: s.status,
-        });
-
-        if (!srvErr) {
-          if (s.questions && s.questions.length > 0) {
-            const qRows = s.questions.map((q, idx) => ({
-              id: q.id,
-              survey_id: s.id,
-              question_text: q.question_text,
-              question_type: q.question_type,
-              options: q.options || [],
-              order_index: idx,
-            }));
-            await supabase.from('questions').insert(qRows);
-          }
-
-          if (s.respondents && s.respondents.length > 0) {
-            for (let i = 0; i < s.respondents.length; i += 500) {
-              const chunk = s.respondents.slice(i, i + 500);
-              await supabase.from('respondents').insert(chunk);
-            }
-          }
-
-          if (s.answers && s.answers.length > 0) {
-            for (let i = 0; i < s.answers.length; i += 1000) {
-              const chunk = s.answers.slice(i, i + 1000);
-              await supabase.from('answers').insert(chunk);
-            }
-          }
-
-          syncedCount++;
-        }
-      }
-    } catch (err) {
-      console.warn('Error syncing survey to Supabase:', s.id, err);
-    }
-  }
-
-  return { success: true, count: syncedCount };
 }

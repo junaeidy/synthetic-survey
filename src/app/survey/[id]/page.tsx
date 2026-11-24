@@ -18,6 +18,7 @@ import {
   BarChart3,
   RefreshCw,
   Layers,
+  AlertTriangle,
 } from 'lucide-react';
 
 export default function SurveyDetailPage() {
@@ -26,14 +27,22 @@ export default function SurveyDetailPage() {
 
   const [analytics, setAnalytics] = useState<SurveyAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isSimulatorOpen, setIsSimulatorOpen] = useState(false);
 
   const loadData = useCallback(async () => {
     if (!surveyId) return;
     setLoading(true);
-    const data = await fetchSurveyAnalytics(surveyId);
-    setAnalytics(data);
-    setLoading(false);
+    setError(null);
+    try {
+      const data = await fetchSurveyAnalytics(surveyId);
+      setAnalytics(data);
+    } catch (err: unknown) {
+      console.error('Error fetching survey analytics:', err);
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setLoading(false);
+    }
   }, [surveyId]);
 
   useEffect(() => {
@@ -48,11 +57,47 @@ export default function SurveyDetailPage() {
     );
   }
 
+  if (error) {
+    return (
+      <div className="py-16 max-w-2xl mx-auto space-y-4">
+        <div className="rounded-2xl border border-rose-300 bg-rose-50/70 p-6 dark:border-rose-900 dark:bg-rose-950/30">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
+            <div className="space-y-2 flex-1">
+              <h3 className="text-sm font-semibold text-rose-900 dark:text-rose-200">
+                Gagal Mengambil Data Survei dari Supabase
+              </h3>
+              <p className="text-xs text-rose-800 dark:text-rose-300 font-mono bg-rose-100/60 dark:bg-rose-900/40 p-2.5 rounded-lg border border-rose-200 dark:border-rose-800 break-words">
+                {error}
+              </p>
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  onClick={loadData}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-700 text-white hover:bg-rose-800 text-xs font-medium transition-all"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  <span>Coba Lagi</span>
+                </button>
+                <Link
+                  href="/"
+                  className="inline-flex items-center gap-1.5 text-xs text-neutral-600 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100 font-mono"
+                >
+                  <ArrowLeft className="h-3 w-3" />
+                  <span>Kembali ke Beranda</span>
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!analytics) {
     return (
       <div className="py-24 text-center space-y-3">
         <p className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">
-          Kuesioner tidak ditemukan
+          Kuesioner tidak ditemukan di Supabase
         </p>
         <Link
           href="/"
