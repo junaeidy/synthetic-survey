@@ -47,13 +47,13 @@ export default function HomePage() {
         <div>
           <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-neutral-100 text-neutral-600 dark:bg-neutral-900 dark:text-neutral-400 text-xs font-mono mb-3">
             <Sparkles className="h-3 w-3 text-indigo-500" />
-            <span>Synthetic Research Simulation Platform</span>
+            <span>Platform Kuesioner & Riset Digital</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
-            Kuesioner & Responden AI Sintetis
+            Kuesioner & Analisis Survei Riset
           </h1>
           <p className="mt-1 text-sm text-neutral-500 max-w-2xl">
-            Rancang angket kuesioner Anda, tentukan jumlah responden dan rentang waktu pengisian, lalu biarkan bot AI mengisi data realistis yang langsung siap divisualisasikan dalam aneka grafik dinamis.
+            Rancang kuesioner Anda, tentukan target responden serta rentang waktu pengisian, dan visualisasikan hasilnya secara langsung dalam aneka grafik analitik yang dinamis.
           </p>
         </div>
 
@@ -81,24 +81,24 @@ export default function HomePage() {
 
         <div className="p-4 rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900/60">
           <div className="flex items-center justify-between text-neutral-500">
-            <span className="text-xs font-mono uppercase">Total Responden Bot</span>
+            <span className="text-xs font-mono uppercase">Total Responden</span>
             <Users className="h-4 w-4" />
           </div>
           <p className="text-2xl font-bold font-mono text-neutral-900 dark:text-neutral-100 mt-2">
             {totalRespondentsAll}
           </p>
-          <p className="text-[11px] text-neutral-400 font-mono mt-0.5">Jawaban sintetis terisi</p>
+          <p className="text-[11px] text-neutral-400 font-mono mt-0.5">Total tanggapan masuk</p>
         </div>
 
         <div className="p-4 rounded-xl border border-neutral-200 bg-white shadow-sm dark:border-neutral-800 dark:bg-neutral-900/60">
           <div className="flex items-center justify-between text-neutral-500">
-            <span className="text-xs font-mono uppercase">Mesin Pengisi</span>
+            <span className="text-xs font-mono uppercase">Distribusi Tanggapan</span>
             <Sparkles className="h-4 w-4" />
           </div>
           <p className="text-lg font-bold font-mono text-neutral-900 dark:text-neutral-100 mt-2">
-            Gemini Flash + Batch
+            Otomatis & Realistis
           </p>
-          <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-mono mt-0.5">Anti-Slop & Rate-Limit Safe</p>
+          <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-mono mt-0.5">Variatif & Sebaran Alami</p>
         </div>
       </div>
 
@@ -189,7 +189,7 @@ export default function HomePage() {
                             : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800'
                         }`}
                       >
-                        {isCompleted ? 'Target Tercapai' : 'Perlu Simulasi'}
+                        {isCompleted ? 'Target Tercapai' : 'Sedang Berjalan'}
                       </span>
 
                       <span className="flex items-center gap-1 text-[11px] font-mono text-neutral-400">

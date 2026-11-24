@@ -71,10 +71,10 @@ export default function TimelineChart({
             <TrendingUp className="h-4 w-4 text-indigo-500" />
             <span>
               {viewMode === 'daily'
-                ? 'Fluktuasi Respons Harian (Naik - Turun Alami)'
+                ? 'Distribusi Respons Harian'
                 : viewMode === 'combo'
-                ? 'Gabungan Respons Harian & Total Akumulasi'
-                : 'Pertumbuhan Total Akumulatif'}
+                ? 'Respons Harian & Total Akumulasi'
+                : 'Total Akumulasi Responden'}
             </span>
           </h3>
         </div>
@@ -91,7 +91,7 @@ export default function TimelineChart({
             }`}
           >
             <BarChart2 className="h-3.5 w-3.5" />
-            <span>Harian (Naik/Turun)</span>
+            <span>Respons Harian</span>
           </button>
 
           <button

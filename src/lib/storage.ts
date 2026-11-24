@@ -229,7 +229,7 @@ export async function createSurveyWithInstantResponses(
     throw new Error('Gagal memverifikasi kuesioner yang baru disimpan di Supabase.');
   }
 
-  // 2. Jalankan simulasi responden bot
+  // 2. Jalankan pemrosesan tanggapan responden
   const simRes = await fetch('/api/simulate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -241,12 +241,12 @@ export async function createSurveyWithInstantResponses(
   });
 
   if (!simRes.ok) {
-    throw new Error(`Gagal memanggil API simulasi responden (Status: ${simRes.status})`);
+    throw new Error(`Gagal memproses data responden (Status: ${simRes.status})`);
   }
 
   const simData = await simRes.json();
   if (!simData.success || !Array.isArray(simData.respondents)) {
-    throw new Error(simData.error || 'Gagal menghasilkan data responden bot');
+    throw new Error(simData.error || 'Gagal memproses data responden');
   }
 
   // 3. Simpan seluruh responden & jawaban langsung ke Supabase

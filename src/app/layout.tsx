@@ -15,8 +15,8 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: 'SimSurvei - Synthetic Survey & Bot Response Simulator',
-  description: 'Simulasi riset kuesioner dengan responden AI sintetis berbasis Gemini & Supabase',
+  title: 'SimSurvei - Platform Kuesioner & Analisis Riset',
+  description: 'Platform pembuatan kuesioner dan visualisasi analitik riset modern',
 };
 
 export default function RootLayout({

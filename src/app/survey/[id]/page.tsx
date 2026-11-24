@@ -12,13 +12,13 @@ import SimulatorModal from '@/components/SimulatorModal';
 import ExportButton from '@/components/ExportButton';
 import {
   ArrowLeft,
-  Bot,
   Calendar,
   Users,
   BarChart3,
   RefreshCw,
   Layers,
   AlertTriangle,
+  UserPlus,
 } from 'lucide-react';
 
 export default function SurveyDetailPage() {
@@ -137,7 +137,7 @@ export default function SurveyDetailPage() {
                   : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800'
               }`}
             >
-              {isTargetAchieved ? 'Target Tercapai' : 'Simulasi Dibutuhkan'}
+              {isTargetAchieved ? 'Target Tercapai' : 'Pengumpulan Aktif'}
             </span>
             <span className="text-xs font-mono text-neutral-400">
               ID: {survey.id.slice(0, 8)}...
@@ -167,8 +167,8 @@ export default function SurveyDetailPage() {
             onClick={() => setIsSimulatorOpen(true)}
             className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-neutral-900 text-white hover:bg-neutral-800 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-200 text-xs font-medium transition-all shadow-sm"
           >
-            <Bot className="h-3.5 w-3.5" />
-            <span>{respondents.length === 0 ? 'Mulai Simulasi Bot' : 'Jalankan Bot Tambahan'}</span>
+            <UserPlus className="h-3.5 w-3.5" />
+            <span>Tambah Responden</span>
           </button>
         </div>
       </div>
@@ -223,7 +223,7 @@ export default function SurveyDetailPage() {
             <BarChart3 className="h-4 w-4" />
           </div>
           <p className="text-lg font-bold font-mono text-neutral-900 dark:text-neutral-100 mt-2">
-            {respondents.length > 0 ? 'Siap Analisis' : 'Menunggu Bot'}
+            {respondents.length > 0 ? 'Siap Analisis' : 'Belum Ada Responden'}
           </p>
           <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-mono mt-0.5">
             Grafik dapat disesuaikan

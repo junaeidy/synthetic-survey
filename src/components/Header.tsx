@@ -31,7 +31,7 @@ export default function Header() {
                 <span className="font-semibold tracking-tight text-neutral-900 dark:text-neutral-100 text-base">
                   SimSurvei <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400 font-normal">v1.0</span>
                 </span>
-                <p className="text-[11px] text-neutral-500 font-mono tracking-wide -mt-0.5">Synthetic Respondent Engine</p>
+                <p className="text-[11px] text-neutral-500 font-mono tracking-wide -mt-0.5">Platform Kuesioner & Riset</p>
               </div>
             </Link>
 

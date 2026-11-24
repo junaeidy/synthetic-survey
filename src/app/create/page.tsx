@@ -377,7 +377,7 @@ export default function CreateSurveyPage() {
           Parameter & Butir Pertanyaan Angket
         </h1>
         <p className="mt-1 text-xs text-neutral-500">
-          Periksa butir pertanyaan di bawah ini. Setelah disimpan, seluruh responden bot akan <strong>langsung mengisi kuesioner secara otomatis</strong> dengan sebaran tanggal dan waktu yang berbeda-beda.
+          Periksa butir pertanyaan di bawah ini. Setelah disimpan, data kuesioner dan tanggapan responden akan <strong>langsung diproses secara otomatis</strong> dengan sebaran tanggal dan waktu yang berbeda-beda.
         </p>
       </div>
 
@@ -650,7 +650,7 @@ export default function CreateSurveyPage() {
 
                 {q.question_type === 'text' && (
                   <div className="pt-2 border-t border-neutral-100 dark:border-neutral-800 text-xs text-neutral-500 font-mono">
-                    💡 Bot AI akan langsung mengisi tanggapan teks kualitatif berbahasa Indonesia yang autentik sesuai persona.
+                    💡 Tanggapan teks isian terbuka akan diproses dengan kalimat autentik bahasa Indonesia sesuai karakteristik responden.
                   </div>
                 )}
               </div>
@@ -674,12 +674,12 @@ export default function CreateSurveyPage() {
             {isSubmitting ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Menghasilkan {targetRespondents} Responden Bot (Tanggal Acak)...</span>
+                <span>Menyimpan Kuesioner & Memproses {targetRespondents} Responden...</span>
               </>
             ) : (
               <>
                 <Sparkles className="h-4 w-4" />
-                <span>Simpan & Langsung Buat Hasil Grafik Lengkap</span>
+                <span>Simpan Kuesioner & Buat Analitik</span>
               </>
             )}
           </button>
