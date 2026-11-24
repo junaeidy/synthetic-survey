@@ -500,3 +500,74 @@ export async function fetchSurveyAnalytics(surveyId: string): Promise<SurveyAnal
     timelineData,
   };
 }
+
+export function getLocalSurveysCount(): number {
+  if (typeof window === 'undefined') return 0;
+  const local = getLocalData();
+  return local.length;
+}
+
+export async function syncLocalDataToSupabase(): Promise<{ success: boolean; count: number; error?: string }> {
+  const supabase = getSupabase();
+  if (!isSupabaseConfigured() || !supabase) {
+    return {
+      success: false,
+      count: 0,
+      error: 'Supabase belum terhubung. Pastikan NEXT_PUBLIC_SUPABASE_ANON_KEY di .env.local menggunakan format JWT (diawali eyJ...).',
+    };
+  }
+
+  const local = getLocalData();
+  let syncedCount = 0;
+
+  for (const s of local) {
+    try {
+      const { data: existing } = await supabase.from('surveys').select('id').eq('id', s.id).single();
+      if (!existing) {
+        const { error: srvErr } = await supabase.from('surveys').insert({
+          id: s.id,
+          title: s.title,
+          description: s.description,
+          target_respondents: s.target_respondents,
+          start_date: s.start_date,
+          end_date: s.end_date,
+          status: s.status,
+        });
+
+        if (!srvErr) {
+          if (s.questions && s.questions.length > 0) {
+            const qRows = s.questions.map((q, idx) => ({
+              id: q.id,
+              survey_id: s.id,
+              question_text: q.question_text,
+              question_type: q.question_type,
+              options: q.options || [],
+              order_index: idx,
+            }));
+            await supabase.from('questions').insert(qRows);
+          }
+
+          if (s.respondents && s.respondents.length > 0) {
+            for (let i = 0; i < s.respondents.length; i += 500) {
+              const chunk = s.respondents.slice(i, i + 500);
+              await supabase.from('respondents').insert(chunk);
+            }
+          }
+
+          if (s.answers && s.answers.length > 0) {
+            for (let i = 0; i < s.answers.length; i += 1000) {
+              const chunk = s.answers.slice(i, i + 1000);
+              await supabase.from('answers').insert(chunk);
+            }
+          }
+
+          syncedCount++;
+        }
+      }
+    } catch (err) {
+      console.warn('Error syncing survey to Supabase:', s.id, err);
+    }
+  }
+
+  return { success: true, count: syncedCount };
+}
