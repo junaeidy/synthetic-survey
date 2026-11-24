@@ -2,22 +2,80 @@ import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 import { Question, Survey } from '@/types/survey';
 
-function generateRealisticTimestamp(startDateStr: string, endDateStr: string): string {
+function generateFluctuatingDailyCounts(totalRespondents: number, numDays: number): number[] {
+  if (numDays <= 1) return [totalRespondents];
+
+  // Algoritma Pola Gelombang Fluktuatif Alami:
+  // Mensimulasikan perilaku survei nyata (Hari 1 ramai, Hari 2 turun, Hari 3 lonjakan reminder, Hari 4 turun, dst.)
+  const rawWeights: number[] = [];
+  for (let d = 0; d < numDays; d++) {
+    // Pola selang-seling tajam antara hari ramai (peak) dan hari sepi (dip)
+    const isPeakDay = d % 2 === 0;
+    const baseWeight = isPeakDay
+      ? 1.5 + Math.random() * 0.9 // Hari ramai: bobot 1.5 - 2.4
+      : 0.35 + Math.random() * 0.4; // Hari sepi/turun: bobot 0.35 - 0.75
+
+    // Hari pertama (peluncuran awal) dan hari terakhir (rush sebelum tutup)
+    let dayBonus = 1.0;
+    if (d === 0) dayBonus = 1.35;
+    if (d === numDays - 1) dayBonus = 1.3;
+
+    rawWeights.push(Math.max(0.2, baseWeight * dayBonus));
+  }
+
+  // Normalisasi bobot agar jumlahnya pas tepat sama dengan totalRespondents
+  const sumWeights = rawWeights.reduce((a, b) => a + b, 0);
+  const counts = rawWeights.map((w) => Math.floor((w / sumWeights) * totalRespondents));
+
+  // Bagikan sisa selisih pembulatan
+  const assigned = counts.reduce((a, b) => a + b, 0);
+  let remainder = totalRespondents - assigned;
+  let idx = 0;
+  while (remainder > 0) {
+    counts[idx % numDays]++;
+    remainder--;
+    idx += 2; // Alokasikan ke hari-hari puncak agar kontras naik-turun tetap tajam
+  }
+
+  return counts;
+}
+
+function generateFluctuatingTimestamps(startDateStr: string, endDateStr: string, totalCount: number): string[] {
   const start = new Date(startDateStr).getTime();
   const end = new Date(endDateStr).getTime();
 
   if (isNaN(start) || isNaN(end) || end <= start) {
-    return new Date().toISOString();
+    return Array.from({ length: totalCount }).map(() => new Date().toISOString());
   }
 
-  const randomTime = start + Math.random() * (end - start);
-  const date = new Date(randomTime);
-  const realisticHour = Math.floor(8 + Math.random() * 14); // 8 s/d 21
-  date.setHours(realisticHour);
-  date.setMinutes(Math.floor(Math.random() * 60));
-  date.setSeconds(Math.floor(Math.random() * 60));
+  const oneDayMs = 24 * 60 * 60 * 1000;
+  const numDays = Math.max(2, Math.round((end - start) / oneDayMs));
+  const dailyCounts = generateFluctuatingDailyCounts(totalCount, numDays);
 
-  return date.toISOString();
+  const timestamps: string[] = [];
+  dailyCounts.forEach((countForDay, dayIdx) => {
+    const dayStartMs = start + dayIdx * oneDayMs;
+    for (let i = 0; i < countForDay; i++) {
+      // Jam pengisian realistis: 08:30 s/d 22:00
+      // Jam sibuk/ramai pengisian: 09:30-12:00 dan 19:00-21:30
+      const isRushHour = Math.random() > 0.4;
+      let hour: number;
+      if (isRushHour) {
+        hour = Math.random() > 0.5 ? Math.floor(9 + Math.random() * 4) : Math.floor(19 + Math.random() * 3);
+      } else {
+        hour = Math.floor(8 + Math.random() * 14); // 8 - 21
+      }
+      const minute = Math.floor(Math.random() * 60);
+      const second = Math.floor(Math.random() * 60);
+
+      const d = new Date(dayStartMs);
+      d.setHours(hour, minute, second);
+      timestamps.push(d.toISOString());
+    }
+  });
+
+  // Urutkan timestamps kronologis
+  return timestamps.sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
 }
 
 const DEFAULT_PERSONAS = [
@@ -102,7 +160,7 @@ function generateHeuristicBatch(
       persona_profile: personaSeed.profile,
       persona_sentiment: personaSeed.sentiment,
       answers,
-      submitted_at: generateRealisticTimestamp(survey.start_date, survey.end_date),
+      submitted_at: new Date().toISOString(),
     };
   });
 }
@@ -185,7 +243,7 @@ Format JSON:
                 ? item.persona_sentiment
                 : 'neutral',
             answers: item.answers || {},
-            submitted_at: generateRealisticTimestamp(survey.start_date, survey.end_date),
+            submitted_at: new Date().toISOString(),
           });
         });
       } catch (geminiErr: unknown) {
@@ -200,6 +258,12 @@ Format JSON:
       const heuristicBatch = generateHeuristicBatch(survey, questions, remainingCount, allRespondents.length);
       allRespondents.push(...heuristicBatch);
     }
+
+    // Terapkan distribusi waktu fluktuatif (gelombang naik-turun alami harian) ke seluruh responden
+    const timestamps = generateFluctuatingTimestamps(survey.start_date, survey.end_date, allRespondents.length);
+    allRespondents.forEach((item, idx) => {
+      item.submitted_at = timestamps[idx] || new Date().toISOString();
+    });
 
     return NextResponse.json({ success: true, respondents: allRespondents });
   } catch (error: unknown) {
