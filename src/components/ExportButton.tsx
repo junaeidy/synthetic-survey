@@ -18,6 +18,12 @@ export default function ExportButton({ analytics }: ExportButtonProps) {
       headers.push(`Q${idx + 1}_${q.question_text.replace(/"/g, '""')}`);
     });
 
+    // Petakan jawaban ke Map O(1) agar cepat memproses ribuan data responden
+    const answerMap = new Map<string, string>();
+    answers.forEach((a) => {
+      answerMap.set(`${a.respondent_id}_${a.question_id}`, a.answer_value);
+    });
+
     // Baris data per responden
     const rows = respondents.map((r) => {
       const rowData = [
@@ -28,11 +34,8 @@ export default function ExportButton({ analytics }: ExportButtonProps) {
       ];
 
       questions.forEach((q) => {
-        const ans = answers.find(
-          (a) => a.respondent_id === r.id && a.question_id === q.id
-        );
-        const ansValue = ans ? ans.answer_value.replace(/"/g, '""') : '';
-        rowData.push(`"${ansValue}"`);
+        const ansValue = answerMap.get(`${r.id}_${q.id}`) || '';
+        rowData.push(`"${ansValue.replace(/"/g, '""')}"`);
       });
 
       return rowData.join(',');

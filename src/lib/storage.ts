@@ -255,6 +255,40 @@ export async function createSurveyWithInstantResponses(
   return surveyId;
 }
 
+// Helper untuk mengambil seluruh data dari Supabase dengan pagination otomatis
+// Mengatasi limit default max-rows (1000 baris) dari Supabase / PostgREST API
+async function fetchAllPaginated<T>(
+  fetchPage: (from: number, to: number) => Promise<{ data: T[] | null; error: unknown }>
+): Promise<T[]> {
+  const allData: T[] = [];
+  const pageSize = 1000;
+  let page = 0;
+  let hasMore = true;
+
+  while (hasMore) {
+    const from = page * pageSize;
+    const to = from + pageSize - 1;
+    const { data, error } = await fetchPage(from, to);
+
+    if (error) {
+      throw error;
+    }
+
+    if (!data || data.length === 0) {
+      hasMore = false;
+    } else {
+      allData.push(...data);
+      if (data.length < pageSize) {
+        hasMore = false;
+      } else {
+        page++;
+      }
+    }
+  }
+
+  return allData;
+}
+
 export async function fetchSurveyAnalytics(surveyId: string): Promise<SurveyAnalytics> {
   const supabase = getSupabase();
 
@@ -268,19 +302,38 @@ export async function fetchSurveyAnalytics(surveyId: string): Promise<SurveyAnal
     throw formatSupabaseError(qErr, `fetchSurveyAnalytics questions (${surveyId})`);
   }
 
-  const { data: resps, error: respErr } = await supabase.from('respondents').select('*').eq('survey_id', surveyId).order('submitted_at');
-  if (respErr) {
+  // Ambil seluruh data responden dengan pagination otomatis (melewati batasan default 1000 baris PostgREST)
+  let respondents: Respondent[] = [];
+  try {
+    respondents = await fetchAllPaginated<Respondent>(async (from, to) => {
+      const res = await supabase
+        .from('respondents')
+        .select('*')
+        .eq('survey_id', surveyId)
+        .order('submitted_at', { ascending: true })
+        .range(from, to);
+      return { data: (res.data as Respondent[]) || null, error: res.error };
+    });
+  } catch (respErr) {
     throw formatSupabaseError(respErr, `fetchSurveyAnalytics respondents (${surveyId})`);
   }
 
-  const { data: anss, error: ansErr } = await supabase.from('answers').select('*').eq('survey_id', surveyId);
-  if (ansErr) {
+  // Ambil seluruh jawaban (answers) dengan pagination otomatis (misal 1694 responden x 10 pertanyaan = 16.940 baris)
+  let answers: Answer[] = [];
+  try {
+    answers = await fetchAllPaginated<Answer>(async (from, to) => {
+      const res = await supabase
+        .from('answers')
+        .select('*')
+        .eq('survey_id', surveyId)
+        .range(from, to);
+      return { data: (res.data as Answer[]) || null, error: res.error };
+    });
+  } catch (ansErr) {
     throw formatSupabaseError(ansErr, `fetchSurveyAnalytics answers (${surveyId})`);
   }
 
   const questions: Question[] = qs || [];
-  const respondents: Respondent[] = resps || [];
-  const answers: Answer[] = anss || [];
 
   // Hitung Statistik per Pertanyaan
   const questionStats: SurveyAnalytics['questionStats'] = {};
