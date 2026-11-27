@@ -19,6 +19,7 @@ import {
   Layers,
   AlertTriangle,
   UserPlus,
+  Loader2,
 } from 'lucide-react';
 
 export default function SurveyDetailPage() {
@@ -51,8 +52,9 @@ export default function SurveyDetailPage() {
 
   if (loading) {
     return (
-      <div className="py-24 text-center font-mono text-xs text-neutral-400">
-        Memuat data analitik angket...
+      <div className="py-24 text-center space-y-3 font-mono text-xs text-neutral-400">
+        <Loader2 className="h-6 w-6 animate-spin mx-auto text-indigo-600 dark:text-indigo-400" />
+        <p>Memuat data analitik angket...</p>
       </div>
     );
   }

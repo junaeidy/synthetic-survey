@@ -255,38 +255,38 @@ export async function createSurveyWithInstantResponses(
   return surveyId;
 }
 
-// Helper untuk mengambil seluruh data dari Supabase dengan pagination otomatis
-// Mengatasi limit default max-rows (1000 baris) dari Supabase / PostgREST API
-async function fetchAllPaginated<T>(
-  fetchPage: (from: number, to: number) => Promise<{ data: T[] | null; error: unknown }>
+// Helper untuk mengambil seluruh data dari Supabase secara paralel dan terukur
+// Menggunakan exact count terlebih dahulu sehingga jumlah halaman pasti dan tidak terjadi infinite loop
+async function fetchInParallelChunks<T>(
+  totalCount: number,
+  pageSize: number,
+  concurrency: number,
+  fetchFn: (from: number, to: number) => Promise<{ data: T[] | null; error: unknown }>
 ): Promise<T[]> {
-  const allData: T[] = [];
-  const pageSize = 1000;
-  let page = 0;
-  let hasMore = true;
+  const totalPages = Math.ceil(totalCount / pageSize);
+  if (totalPages === 0) return [];
 
-  while (hasMore) {
-    const from = page * pageSize;
-    const to = from + pageSize - 1;
-    const { data, error } = await fetchPage(from, to);
+  const results: T[] = [];
 
-    if (error) {
-      throw error;
+  // Jalankan dalam potongan paralel (concurrency) agar cepat tetapi tidak membebani connection pool
+  for (let i = 0; i < totalPages; i += concurrency) {
+    const chunkPromises = [];
+    for (let p = i; p < Math.min(i + concurrency, totalPages); p++) {
+      const from = p * pageSize;
+      const to = from + pageSize - 1;
+      chunkPromises.push(fetchFn(from, to));
     }
 
-    if (!data || data.length === 0) {
-      hasMore = false;
-    } else {
-      allData.push(...data);
-      if (data.length < pageSize) {
-        hasMore = false;
-      } else {
-        page++;
+    const chunkResults = await Promise.all(chunkPromises);
+    for (const res of chunkResults) {
+      if (res.error) throw res.error;
+      if (res.data) {
+        results.push(...res.data);
       }
     }
   }
 
-  return allData;
+  return results;
 }
 
 export async function fetchSurveyAnalytics(surveyId: string): Promise<SurveyAnalytics> {
@@ -302,33 +302,71 @@ export async function fetchSurveyAnalytics(surveyId: string): Promise<SurveyAnal
     throw formatSupabaseError(qErr, `fetchSurveyAnalytics questions (${surveyId})`);
   }
 
-  // Ambil seluruh data responden dengan pagination otomatis (melewati batasan default 1000 baris PostgREST)
+  // 1. Cek total responden yang ada di database secara instan
+  const { count: respCount, error: countErr } = await supabase
+    .from('respondents')
+    .select('id', { count: 'exact', head: true })
+    .eq('survey_id', surveyId);
+
+  if (countErr) {
+    throw formatSupabaseError(countErr, `fetchSurveyAnalytics respondents count (${surveyId})`);
+  }
+
+  const totalRespondents = respCount || 0;
+
+  // 2. Ambil seluruh data responden secara paralel (cepat & bebas limit 1000)
   let respondents: Respondent[] = [];
   try {
-    respondents = await fetchAllPaginated<Respondent>(async (from, to) => {
-      const res = await supabase
-        .from('respondents')
-        .select('*')
-        .eq('survey_id', surveyId)
-        .order('submitted_at', { ascending: true })
-        .range(from, to);
-      return { data: (res.data as Respondent[]) || null, error: res.error };
-    });
+    respondents = await fetchInParallelChunks<Respondent>(
+      totalRespondents,
+      1000,
+      4,
+      async (from, to) => {
+        const res = await supabase
+          .from('respondents')
+          .select('*')
+          .eq('survey_id', surveyId)
+          .order('id', { ascending: true })
+          .range(from, to);
+        return { data: (res.data as Respondent[]) || null, error: res.error };
+      }
+    );
   } catch (respErr) {
     throw formatSupabaseError(respErr, `fetchSurveyAnalytics respondents (${surveyId})`);
   }
 
-  // Ambil seluruh jawaban (answers) dengan pagination otomatis (misal 1694 responden x 10 pertanyaan = 16.940 baris)
+  // Urutkan responden berdasarkan submitted_at untuk konsistensi linimasa
+  respondents.sort((a, b) => new Date(a.submitted_at).getTime() - new Date(b.submitted_at).getTime());
+
+  // 3. Cek total jawaban (answers) yang ada di database secara instan
+  const { count: ansCount, error: ansCountErr } = await supabase
+    .from('answers')
+    .select('id', { count: 'exact', head: true })
+    .eq('survey_id', surveyId);
+
+  if (ansCountErr) {
+    throw formatSupabaseError(ansCountErr, `fetchSurveyAnalytics answers count (${surveyId})`);
+  }
+
+  const totalAnswers = ansCount || 0;
+
+  // 4. Ambil data jawaban secara paralel (hanya kolom yang diperlukan untuk analitik & ekspor)
   let answers: Answer[] = [];
   try {
-    answers = await fetchAllPaginated<Answer>(async (from, to) => {
-      const res = await supabase
-        .from('answers')
-        .select('*')
-        .eq('survey_id', surveyId)
-        .range(from, to);
-      return { data: (res.data as Answer[]) || null, error: res.error };
-    });
+    answers = await fetchInParallelChunks<Answer>(
+      totalAnswers,
+      1000,
+      6,
+      async (from, to) => {
+        const res = await supabase
+          .from('answers')
+          .select('id, question_id, respondent_id, answer_value')
+          .eq('survey_id', surveyId)
+          .order('id', { ascending: true })
+          .range(from, to);
+        return { data: (res.data as Answer[]) || null, error: res.error };
+      }
+    );
   } catch (ansErr) {
     throw formatSupabaseError(ansErr, `fetchSurveyAnalytics answers (${surveyId})`);
   }
