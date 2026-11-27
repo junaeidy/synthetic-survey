@@ -98,3 +98,23 @@ GRANT ALL ON ALL ROUTINES IN SCHEMA public TO anon, authenticated;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON ROUTINES TO anon, authenticated;
+
+-- 10. PostgreSQL RPC Function untuk Agregasi Analitik Sub-Detik (Ultra Fast Analytics)
+-- Fungsi ini menghitung distribusi jawaban langsung di database PostgreSQL dalam hitungan milidetik.
+CREATE OR REPLACE FUNCTION get_survey_distribution(p_survey_id UUID)
+RETURNS TABLE (
+  question_id UUID,
+  answer_value TEXT,
+  count BIGINT
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+AS $$
+  SELECT question_id, answer_value, COUNT(*)::BIGINT
+  FROM answers
+  WHERE survey_id = p_survey_id
+  GROUP BY question_id, answer_value;
+$$;
+
+GRANT EXECUTE ON FUNCTION get_survey_distribution(UUID) TO anon, authenticated;

@@ -289,30 +289,58 @@ async function fetchInParallelChunks<T>(
   return results;
 }
 
-export async function fetchSurveyAnalytics(surveyId: string): Promise<SurveyAnalytics> {
+export async function fetchSurveyAnswersForExport(surveyId: string): Promise<Answer[]> {
   const supabase = getSupabase();
-
-  const { data: srv, error: srvErr } = await supabase.from('surveys').select('*').eq('id', surveyId).single();
-  if (srvErr || !srv) {
-    throw formatSupabaseError(srvErr || new Error('Kuesioner tidak ditemukan'), `fetchSurveyAnalytics surveys (${surveyId})`);
-  }
-
-  const { data: qs, error: qErr } = await supabase.from('questions').select('*').eq('survey_id', surveyId).order('order_index');
-  if (qErr) {
-    throw formatSupabaseError(qErr, `fetchSurveyAnalytics questions (${surveyId})`);
-  }
-
-  // 1. Cek total responden yang ada di database secara instan
-  const { count: respCount, error: countErr } = await supabase
-    .from('respondents')
+  const { count: ansCount, error: ansCountErr } = await supabase
+    .from('answers')
     .select('id', { count: 'exact', head: true })
     .eq('survey_id', surveyId);
 
-  if (countErr) {
-    throw formatSupabaseError(countErr, `fetchSurveyAnalytics respondents count (${surveyId})`);
+  if (ansCountErr) {
+    throw formatSupabaseError(ansCountErr, `fetchSurveyAnswersForExport count (${surveyId})`);
   }
 
-  const totalRespondents = respCount || 0;
+  const totalAnswers = ansCount || 0;
+  if (totalAnswers === 0) return [];
+
+  return fetchInParallelChunks<Answer>(
+    totalAnswers,
+    1000,
+    25,
+    async (from, to) => {
+      const res = await supabase
+        .from('answers')
+        .select('id, question_id, respondent_id, answer_value')
+        .eq('survey_id', surveyId)
+        .range(from, to);
+      return { data: (res.data as Answer[]) || null, error: res.error };
+    }
+  );
+}
+
+export async function fetchSurveyAnalytics(surveyId: string): Promise<SurveyAnalytics> {
+  const supabase = getSupabase();
+
+  // 1. Ambil kuesioner, butir pertanyaan, dan total hitungan responden secara paralel
+  const [srvRes, qRes, respCountRes] = await Promise.all([
+    supabase.from('surveys').select('*').eq('id', surveyId).single(),
+    supabase.from('questions').select('*').eq('survey_id', surveyId).order('order_index'),
+    supabase.from('respondents').select('id', { count: 'exact', head: true }).eq('survey_id', surveyId),
+  ]);
+
+  if (srvRes.error || !srvRes.data) {
+    throw formatSupabaseError(srvRes.error || new Error('Kuesioner tidak ditemukan'), `fetchSurveyAnalytics surveys (${surveyId})`);
+  }
+  if (qRes.error) {
+    throw formatSupabaseError(qRes.error, `fetchSurveyAnalytics questions (${surveyId})`);
+  }
+  if (respCountRes.error) {
+    throw formatSupabaseError(respCountRes.error, `fetchSurveyAnalytics respondents count (${surveyId})`);
+  }
+
+  const survey = srvRes.data;
+  const questions: Question[] = qRes.data || [];
+  const totalRespondents = respCountRes.count || 0;
 
   // 2. Ambil seluruh data responden secara paralel (cepat & bebas limit 1000)
   let respondents: Respondent[] = [];
@@ -320,13 +348,12 @@ export async function fetchSurveyAnalytics(surveyId: string): Promise<SurveyAnal
     respondents = await fetchInParallelChunks<Respondent>(
       totalRespondents,
       1000,
-      4,
+      10,
       async (from, to) => {
         const res = await supabase
           .from('respondents')
           .select('*')
           .eq('survey_id', surveyId)
-          .order('id', { ascending: true })
           .range(from, to);
         return { data: (res.data as Respondent[]) || null, error: res.error };
       }
@@ -338,49 +365,107 @@ export async function fetchSurveyAnalytics(surveyId: string): Promise<SurveyAnal
   // Urutkan responden berdasarkan submitted_at untuk konsistensi linimasa
   respondents.sort((a, b) => new Date(a.submitted_at).getTime() - new Date(b.submitted_at).getTime());
 
-  // 3. Cek total jawaban (answers) yang ada di database secara instan
-  const { count: ansCount, error: ansCountErr } = await supabase
-    .from('answers')
-    .select('id', { count: 'exact', head: true })
-    .eq('survey_id', surveyId);
-
-  if (ansCountErr) {
-    throw formatSupabaseError(ansCountErr, `fetchSurveyAnalytics answers count (${surveyId})`);
-  }
-
-  const totalAnswers = ansCount || 0;
-
-  // 4. Ambil data jawaban secara paralel (hanya kolom yang diperlukan untuk analitik & ekspor)
-  let answers: Answer[] = [];
-  try {
-    answers = await fetchInParallelChunks<Answer>(
-      totalAnswers,
-      1000,
-      6,
-      async (from, to) => {
-        const res = await supabase
-          .from('answers')
-          .select('id, question_id, respondent_id, answer_value')
-          .eq('survey_id', surveyId)
-          .order('id', { ascending: true })
-          .range(from, to);
-        return { data: (res.data as Answer[]) || null, error: res.error };
-      }
-    );
-  } catch (ansErr) {
-    throw formatSupabaseError(ansErr, `fetchSurveyAnalytics answers (${surveyId})`);
-  }
-
-  const questions: Question[] = qs || [];
-
-  // Hitung Statistik per Pertanyaan
+  // 3. Hitung distribusi pilihan jawaban secara cerdas & instan
   const questionStats: SurveyAnalytics['questionStats'] = {};
+  const textQuestions = questions.filter((q) => q.question_type === 'text');
+  const choiceQuestions = questions.filter((q) => q.question_type !== 'text');
 
+  // Jalur Cepat: Coba gunakan PostgreSQL RPC jika sudah di-generate di Supabase (sub-50ms)
+  const distributionMap = new Map<string, Record<string, number>>();
+  let usedRPC = false;
+
+  try {
+    const { data: rpcData, error: rpcErr } = await supabase.rpc('get_survey_distribution', {
+      p_survey_id: surveyId,
+    });
+    if (!rpcErr && Array.isArray(rpcData)) {
+      usedRPC = true;
+      rpcData.forEach((row: { question_id: string; answer_value: string; count: number | string }) => {
+        if (!distributionMap.has(row.question_id)) {
+          distributionMap.set(row.question_id, {});
+        }
+        distributionMap.get(row.question_id)![row.answer_value] = Number(row.count) || 0;
+      });
+    }
+  } catch {
+    usedRPC = false;
+  }
+
+  // Jalur Fallback Cepat: Jika fungsi RPC belum dipasang di Supabase, unduh hanya kolom yang dibutuhkan secara paralel
+  if (!usedRPC && choiceQuestions.length > 0) {
+    const { count: ansCount, error: ansCountErr } = await supabase
+      .from('answers')
+      .select('id', { count: 'exact', head: true })
+      .eq('survey_id', surveyId);
+
+    if (ansCountErr) {
+      throw formatSupabaseError(ansCountErr, `fetchSurveyAnalytics answers count (${surveyId})`);
+    }
+
+    const totalAnswers = ansCount || 0;
+    if (totalAnswers > 0) {
+      const answersBrief = await fetchInParallelChunks<{ question_id: string; answer_value: string }>(
+        totalAnswers,
+        1000,
+        25,
+        async (from, to) => {
+          const res = await supabase
+            .from('answers')
+            .select('question_id, answer_value')
+            .eq('survey_id', surveyId)
+            .range(from, to);
+          return {
+            data: (res.data as Array<{ question_id: string; answer_value: string }>) || null,
+            error: res.error,
+          };
+        }
+      );
+
+      answersBrief.forEach((a) => {
+        if (!distributionMap.has(a.question_id)) {
+          distributionMap.set(a.question_id, {});
+        }
+        const qMap = distributionMap.get(a.question_id)!;
+        qMap[a.answer_value] = (qMap[a.answer_value] || 0) + 1;
+      });
+    }
+  }
+
+  // Jika ada pertanyaan teks terbuka, ambil jawaban teks secara spesifik (maks 100 tanggapan terbaru)
+  const textAnswersMap = new Map<string, Array<{ text: string; persona: string; sentiment: string; date: string }>>();
+  if (textQuestions.length > 0) {
+    const respondentMap = new Map(respondents.map((r) => [r.id, r]));
+    for (const tq of textQuestions) {
+      const { data: tAnswers } = await supabase
+        .from('answers')
+        .select('answer_value, respondent_id')
+        .eq('survey_id', surveyId)
+        .eq('question_id', tq.id)
+        .limit(100);
+
+      const formattedText = (tAnswers || []).map((ta) => {
+        const resp = respondentMap.get(ta.respondent_id);
+        return {
+          text: ta.answer_value,
+          persona: resp?.persona_profile || 'Responden Anonim',
+          sentiment: resp?.persona_sentiment || 'neutral',
+          date: resp?.submitted_at || new Date().toISOString(),
+        };
+      });
+      textAnswersMap.set(tq.id, formattedText);
+    }
+  }
+
+  // Siapkan objek questionStats
   questions.forEach((q) => {
-    const qAnswers = answers.filter((a) => a.question_id === q.id);
-    const totalAns = qAnswers.length;
-
-    if (q.question_type === 'multiple_choice' || q.question_type === 'boolean' || q.question_type === 'likert') {
+    if (q.question_type === 'text') {
+      questionStats[q.id] = {
+        question: q,
+        preferredChart: 'bar_vertical',
+        distribution: [],
+        textResponses: textAnswersMap.get(q.id) || [],
+      };
+    } else {
       const counts: Record<string, number> = {};
 
       if (q.options && q.options.length > 0) {
@@ -390,9 +475,12 @@ export async function fetchSurveyAnalytics(surveyId: string): Promise<SurveyAnal
         counts['Tidak'] = 0;
       }
 
-      qAnswers.forEach((a) => {
-        counts[a.answer_value] = (counts[a.answer_value] || 0) + 1;
-      });
+      const rawCounts = distributionMap.get(q.id) || {};
+      let totalAns = 0;
+      for (const [val, cnt] of Object.entries(rawCounts)) {
+        counts[val] = cnt;
+        totalAns += cnt;
+      }
 
       const distribution = Object.entries(counts).map(([name, count]) => ({
         name,
@@ -410,26 +498,10 @@ export async function fetchSurveyAnalytics(surveyId: string): Promise<SurveyAnal
             : 'bar_vertical',
         distribution,
       };
-    } else {
-      const textResponses = qAnswers.map((a) => {
-        const resp = respondents.find((r) => r.id === a.respondent_id);
-        return {
-          text: a.answer_value,
-          persona: resp?.persona_profile || 'Responden Anonim',
-          sentiment: resp?.persona_sentiment || 'neutral',
-          date: resp?.submitted_at || new Date().toISOString(),
-        };
-      });
-
-      questionStats[q.id] = {
-        question: q,
-        preferredChart: 'bar_vertical',
-        distribution: [],
-        textResponses,
-      };
     }
   });
 
+  // 4. Hitung Linimasa Waktu Pengisian
   const dateCounts: Record<string, number> = {};
   respondents.forEach((r) => {
     const dateKey = new Date(r.submitted_at).toISOString().split('T')[0];
@@ -448,10 +520,10 @@ export async function fetchSurveyAnalytics(surveyId: string): Promise<SurveyAnal
   });
 
   return {
-    survey: srv,
+    survey,
     questions,
     respondents,
-    answers,
+    answers: [], // Jawaban lengkap diunduh secara on-demand saat menekan tombol ekspor CSV
     questionStats,
     timelineData,
   };

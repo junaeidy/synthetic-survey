@@ -150,11 +150,14 @@ export default function QuestionChart({
                   <Tooltip
                     contentStyle={{
                       backgroundColor: '#171717',
-                      borderColor: '#262626',
+                      borderColor: '#383838',
                       borderRadius: '8px',
-                      color: '#fafafa',
+                      color: '#ffffff',
                       fontSize: '12px',
+                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)',
                     }}
+                    itemStyle={{ color: '#ffffff', fontWeight: 500 }}
+                    labelStyle={{ color: '#ffffff', fontWeight: 600, marginBottom: '2px' }}
                     formatter={(value) => [`${String(value)} suara`, 'Jumlah']}
                   />
                   <Bar dataKey="count" radius={[4, 4, 0, 0]}>
@@ -180,11 +183,14 @@ export default function QuestionChart({
                   <Tooltip
                     contentStyle={{
                       backgroundColor: '#171717',
-                      borderColor: '#262626',
+                      borderColor: '#383838',
                       borderRadius: '8px',
-                      color: '#fafafa',
+                      color: '#ffffff',
                       fontSize: '12px',
+                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)',
                     }}
+                    itemStyle={{ color: '#ffffff', fontWeight: 500 }}
+                    labelStyle={{ color: '#ffffff', fontWeight: 600, marginBottom: '2px' }}
                     formatter={(value) => [`${String(value)} suara`, 'Jumlah']}
                   />
                   <Bar dataKey="count" radius={[0, 4, 4, 0]}>
@@ -212,11 +218,14 @@ export default function QuestionChart({
                   <Tooltip
                     contentStyle={{
                       backgroundColor: '#171717',
-                      borderColor: '#262626',
+                      borderColor: '#383838',
                       borderRadius: '8px',
-                      color: '#fafafa',
+                      color: '#ffffff',
                       fontSize: '12px',
+                      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)',
                     }}
+                    itemStyle={{ color: '#ffffff', fontWeight: 500 }}
+                    labelStyle={{ color: '#ffffff', fontWeight: 600, marginBottom: '2px' }}
                     formatter={(value, name) => [
                       `${String(value)} suara (${totalResponses > 0 ? Math.round((Number(value) / totalResponses) * 100) : 0}%)`,
                       String(name),

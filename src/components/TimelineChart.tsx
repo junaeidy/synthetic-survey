@@ -149,11 +149,14 @@ export default function TimelineChart({
                 <Tooltip
                   contentStyle={{
                     backgroundColor: '#171717',
-                    borderColor: '#262626',
+                    borderColor: '#383838',
                     borderRadius: '8px',
-                    color: '#fafafa',
+                    color: '#ffffff',
                     fontSize: '12px',
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)',
                   }}
+                  itemStyle={{ color: '#ffffff', fontWeight: 500 }}
+                  labelStyle={{ color: '#ffffff', fontWeight: 600, marginBottom: '2px' }}
                   formatter={(val, name) => [
                     `${String(val)} responden`,
                     name === 'count' ? 'Masuk Hari Ini' : 'Total Kumulatif',
@@ -186,11 +189,14 @@ export default function TimelineChart({
                 <Tooltip
                   contentStyle={{
                     backgroundColor: '#171717',
-                    borderColor: '#262626',
+                    borderColor: '#383838',
                     borderRadius: '8px',
-                    color: '#fafafa',
+                    color: '#ffffff',
                     fontSize: '12px',
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)',
                   }}
+                  itemStyle={{ color: '#ffffff', fontWeight: 500 }}
+                  labelStyle={{ color: '#ffffff', fontWeight: 600, marginBottom: '2px' }}
                   formatter={(val, name) => [
                     `${String(val)} responden`,
                     name === 'count' ? 'Masuk Hari Ini (Bar)' : 'Total Kumulatif (Garis)',
@@ -234,11 +240,14 @@ export default function TimelineChart({
                 <Tooltip
                   contentStyle={{
                     backgroundColor: '#171717',
-                    borderColor: '#262626',
+                    borderColor: '#383838',
                     borderRadius: '8px',
-                    color: '#fafafa',
+                    color: '#ffffff',
                     fontSize: '12px',
+                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.4)',
                   }}
+                  itemStyle={{ color: '#ffffff', fontWeight: 500 }}
+                  labelStyle={{ color: '#ffffff', fontWeight: 600, marginBottom: '2px' }}
                   formatter={(val, name) => [
                     `${String(val)} responden`,
                     name === 'cumulative' ? 'Total Terkumpul' : 'Masuk Hari Ini',
